@@ -19,7 +19,7 @@ option(POSTGRESQL "Build postgresql" OFF)
 set(SQLITE ON)
 set(MYSQL ON)
 set(POSTGRESQL ON)
-set(ORACLE ON)
+set(ORACLE OFF)
 
 include(FetchContent)
 FetchContent_Declare(
