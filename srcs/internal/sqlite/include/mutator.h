@@ -1,10 +1,8 @@
 #ifndef __MUTATOR_H__
 #define __MUTATOR_H__
-
 #include "ast.h"
 #include "define.h"
 #include "utils.h"
-
 #define LUCKY_NUMBER 500
 
 using namespace std;
@@ -67,7 +65,9 @@ class Mutator {
   static vector<string> v_table_names;
   ~Mutator();
 
-  void debug(IR *root);
+  void debug(IR *root, int level = 0, bool is_left = true, bool is_last = true);
+  string show_struct(IR *root, int level = 0, bool is_left = true,
+                     bool is_root = true);
   unsigned long get_library_size();
   int try_fix(char *buf, int len, char *&new_buf, int &new_len);
 

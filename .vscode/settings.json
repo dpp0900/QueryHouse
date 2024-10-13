@@ -88,7 +88,15 @@
         "complex": "cpp",
         "source_location": "cpp",
         "rope": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "*.def": "cpp",
+        "*.ic": "cpp"
     },
-    "C_Cpp.errorSquiggles": "disabled"
+    "C_Cpp.errorSquiggles": "disabled",
+    "[cpp]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": false,
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "editor.formatOnSave": true,
 }

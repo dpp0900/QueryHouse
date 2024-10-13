@@ -1,7 +1,7 @@
-#include <iostream>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pybind11/embed.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13,19 +13,61 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <filesystem>       // 추가된 코드: 파일 시스템 관련 함수를 사용하기 위해 추가
-
-#include <vector>            // 추가된 코드: 여러 DBClient를 관리하기 위해 추가
-#include <memory>            // 추가된 코드: 스마트 포인터 사용을 위해 추가
-
+#include <filesystem>  // 추가된 코드: 파일 시스템 관련 함수를 사용하기 위해 추가
+#include <iostream>
+#include <memory>  // 추가된 코드: 스마트 포인터 사용을 위해 추가
+#include <vector>  // 추가된 코드: 여러 DBClient를 관리하기 위해 추가
 
 #include "absl/strings/str_format.h"
+#include "ast.h"
 #include "client.h"
 #include "config.h"
+#include "protocol.h"
+#include "transpile.h"
 #include "types.h"
+#include "utils.h"
 #include "yaml-cpp/yaml.h"
 
 using namespace std;
+namespace py = pybind11;
+
+ofstream outfile("out/output.txt");
+ofstream errfile("out/error_log.txt");
+
+void print_buf_queries(const char *buf, size_t length = 0x100) {
+  cout << "buf_queries (first " << length << " bytes):" << endl;
+  for (size_t i = 0; i < length; i++) {
+    if (buf[i] == '\0') {
+      cout << "\\0";
+    } else {
+      cout << buf[i];
+    }
+  }
+  cout << endl;
+}
+
+// SQL 파싱 및 IR 트리 생성을 통해 파싱 여부를 확인하는 함수
+bool is_parse_successful(Round &r) {
+  string query = r.buf_queries;
+  Program *program = parser(query);
+
+  if (!program) {
+    cerr << "Error: SQL parser returned null." << endl;
+    return false;
+  }
+
+  vector<IR *> ir_set;
+  IR *ir = program->translate(ir_set);
+
+  if (!ir) {
+    cerr << "Error: Failed to translate SQL query to IR tree." << endl;
+    delete program;
+    return false;
+  }
+
+  delete program;
+  return true;
+}
 
 u8 *__afl_area_ptr;
 
@@ -47,7 +89,8 @@ static void __afl_map_shm(void) {
   char *ptr;
 
   /* NOTE TODO BUG FIXME: if you want to supply a variable sized map then
-     uncomment the following: */
+                                                                                                                                   uncomment the
+         following: */
 
   if ((ptr = getenv("AFL_MAP_SIZE")) != NULL) {
     u32 val = atoi(ptr);
@@ -167,47 +210,15 @@ int next_testcase(u8 *buf, size_t max_size) {
   return len;
 }
 
-bool isFloat(string myString) {
-  std::istringstream iss(myString);
-  float f;
-  iss >> noskipws >> f; // noskipws considers leading whitespace invalid
-  // Check the entire string was consumed and if either failbit or badbit is set
-  return iss.eof() && !iss.fail();
-}
-
-bool comapre_result(const vector<vector<string>> &result1, const vector<vector<string>> &result2) {
-  if (result1.size() != result2.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < result1.size(); i++) {
-    if (result1[i].size() != result2[i].size()) {
-      return false;
-    }
-    for (size_t j = 0; j < result1[i].size(); j++) {
-      if (isFloat(result1[i][j]) && isFloat(result2[i][j])) {
-        if (stof(result1[i][j]) != stof(result2[i][j])) {
-          return false;
-        }
-      } else {
-        
-        if (result1[i][j] != result2[i][j]) {
-          return false;
-        }
-      }
-    }
-  }
-  return true;
-}
-
 int main(int argc, char *argv[]) {
-  //set basedir as /home/$user/QueryHouse-Framwork
+  // set basedir as /home/$user/QueryHouse-Framwork
   string basedir = getenv("HOME");
   basedir += "/QueryHouse";
   cout << "Basedir: " << basedir << endl;
   string config_file_path = basedir + "/data/config/";
   vector<string> config_files;
-  
-  for (const auto & entry : filesystem::directory_iterator(config_file_path)) {
+
+  for (const auto &entry : filesystem::directory_iterator(config_file_path)) {
     config_files.push_back(entry.path());
     cout << "Load config file: " << entry.path() << endl;
   }
@@ -215,7 +226,7 @@ int main(int argc, char *argv[]) {
   vector<YAML::Node> configs;
   vector<string> db_names;
   vector<string> startup_cmds;
-  for (const auto & config_file : config_files) {
+  for (const auto &config_file : config_files) {
     YAML::Node config = YAML::LoadFile(config_file);
     string db_name = config["db"].as<string>();
     string startup_cmd = config["startup_cmd"].as<string>();
@@ -226,6 +237,8 @@ int main(int argc, char *argv[]) {
     cout << "Startup Command: " << startup_cmd << endl;
     db_clients.emplace_back(client::create_client(db_name, config));
   }
+
+  outfile << YELLOW << "[Create DB clients]" << RESET << endl;
 
   constexpr size_t kMaxInputSize = 0x100000;
   u8 *buf = (u8 *)malloc(kMaxInputSize);
@@ -239,7 +252,6 @@ int main(int argc, char *argv[]) {
   // is stopped and restarted, we should not start another server.
   __afl_map_shm();
 
-
   for (auto &db_client : db_clients) {
     if (!db_client->check_alive()) {
       cout << "DB Client is not alive." << endl;
@@ -251,43 +263,24 @@ int main(int argc, char *argv[]) {
   }
   __afl_start_forkserver();
   while ((len = __afl_next_testcase(buf, kMaxInputSize)) > 0) {
-    FILE *fp = fopen("/tmp/db_driver_log", "a");
-    fwrite(buf, 1, len, fp);
-    fwrite("\n", 1, 1, fp);
-    fclose(fp);
-    vector<vector<vector<string>>> compare_queue;
-    for (auto &db_client : db_clients) {
-      cout << "DB Client: " << db_names[&db_client - &db_clients[0]] << endl;
-      string query((const char *)buf, len);
-      vector<vector<string>> result;
-      db_client->prepare_env();
-      client::ExecutionStatus status = db_client->execute((const char *)buf, len, result);
-      for (const auto &row : result) {
-        for (const auto &col : row) {
-          cout << col << " ";
+    Round *r = (Round *)buf;
+    OraclePlan *p = decode(r);
+    outfile << YELLOW << "[Decode Round->OraclePlan]" << RESET << endl;
+    if (p) {
+      for (auto &db_client : db_clients) {
+        cout << "DB Client: " << db_names[&db_client - &db_clients[0]] << endl;
+        string query((const char *)buf, len);
+        db_client->prepare_env();
+        client::ExecutionStatus status;
+        bool result = execute_plan(*p, db_clients, status);
+        if (status == client::kServerCrash) {
+          while (!db_client->check_alive()) {
+            sleep(5);
+          }
         }
-        cout << endl;
-      }
-      compare_queue.push_back(result);
-      if (status == client::kServerCrash) {
-        while (!db_client->check_alive()) {
-          sleep(5);
-        }
-      }
-      db_client->clean_up_env();
-    }
-    for (size_t i = 0; i < compare_queue.size(); i++) {
-      for (size_t j = i + 1; j < compare_queue.size(); j++) {
-        if (!comapre_result(compare_queue[i], compare_queue[j])) {
-          cout << "Result of " << db_names[i] << " and " << db_names[j] << " is different." << endl;
-        }
-        else {
-          cout << "Result of " << db_names[i] << " and " << db_names[j] << " is same." << endl;
-        }
+        db_client->clean_up_env();
       }
     }
-
-
 
     // remove this, this is just to make afl-fuzz not complain when run
     __afl_area_ptr[1] = 1;
@@ -295,7 +288,6 @@ int main(int argc, char *argv[]) {
     /* report the test case is done and wait for the next */
     __afl_end_testcase(client::kNormal);
   }
-
 
   return 0;
 }

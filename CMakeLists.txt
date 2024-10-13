@@ -21,8 +21,15 @@ set(MYSQL ON)
 set(POSTGRESQL ON)
 set(ORACLE ON)
 
+include(FetchContent)
+FetchContent_Declare(
+    pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+    GIT_TAG        v2.10.1  # 설치할 pybind11 버전 명시
+)
+FetchContent_MakeAvailable(pybind11)
+
 if(MYSQL)
-  list(APPEND DBMS mysql)
   pkg_check_modules(MySQL REQUIRED mysqlclient>=5.7)
   add_library(mysql_client OBJECT srcs/internal/client/client_mysql.cc)
   target_include_directories(mysql_client PUBLIC ${MySQL_INCLUDE_DIRS}
@@ -35,7 +42,6 @@ if(MYSQL)
 endif()
 
 if(POSTGRESQL)
-  list(APPEND DBMS postgresql)
   find_package(PostgreSQL REQUIRED)
   add_library(postgresql_client OBJECT
               srcs/internal/client/client_postgresql.cc)
@@ -74,7 +80,6 @@ if(ORACLE)
   endif()
 
   # Oracle Client 관련 설정
-  list(APPEND DBMS oracle)
   add_library(oracle_client OBJECT srcs/internal/client/client_oracle.cc)
   target_include_directories(oracle_client PUBLIC ${Oracle_INCLUDE_DIRS} srcs/internal/client)
   target_link_directories(oracle_client PUBLIC ${Oracle_LIBRARY_DIRS}) # 라이브러리 경로 추가
@@ -114,12 +119,16 @@ foreach(dbms IN LISTS DBMS)
     srcs/internal/${dbms}/srcs/mutator.cpp
     srcs/internal/${dbms}/srcs/utils.cpp
     srcs/internal/${dbms}/parser/bison_parser.cpp
-    srcs/internal/${dbms}/parser/flex_lexer.cpp)
+    srcs/internal/${dbms}/parser/flex_lexer.cpp
+    srcs/protocol.cpp
+    srcs/protocol.h
+    srcs/transpile.cpp
+    srcs/transpile.h)
   target_include_directories(${dbms}_impl PRIVATE srcs/internal/${dbms}/include
                                                   srcs)
   target_compile_options(${dbms}_impl PRIVATE -fPIC)
   target_link_libraries(${dbms}_impl ${YAML_CPP_LIBRARIES} absl::strings
-                        absl::str_format)
+                        absl::str_format pybind11::embed)
 
   string(TOUPPER ${dbms} UPPER_CASE_DBMS)
   add_library(${dbms}_mutator SHARED srcs/custom_mutator.cc srcs/db_factory.cc)
@@ -129,11 +138,22 @@ foreach(dbms IN LISTS DBMS)
   target_compile_definitions(${dbms}_mutator
                              PRIVATE __SQUIRREL_${UPPER_CASE_DBMS}__)
 endforeach()
-
 if(MYSQL OR POSTGRESQL OR SQLITE)
+  include_directories(srcs)
+  include_directories(srcs/internal/client)
+  add_library(libs OBJECT srcs/protocol.cpp
+                          srcs/internal/sqlite/srcs/ast.cpp
+                          srcs/internal/sqlite/srcs/mutator.cpp
+                          srcs/internal/sqlite/srcs/utils.cpp
+                          srcs/internal/sqlite/parser/bison_parser.cpp
+                          srcs/internal/sqlite/parser/flex_lexer.cpp)
+  target_include_directories(libs PUBLIC srcs/internal/client
+                                             srcs/internal/sqlite/include)
   add_executable(db_driver srcs/db_driver.cc)
+  target_include_directories(db_driver PRIVATE srcs/internal/sqlite/include)
+  target_include_directories(db_driver PRIVATE srcs/internal/sqlite/srcs)
   target_link_libraries(db_driver ${YAML_CPP_LIBRARIES} all_client
-                        absl::strings absl::str_format)
+                        absl::strings absl::str_format pybind11::embed libs)
 
   add_executable(test_client srcs/internal/client/test_client.cc)
   target_link_libraries(test_client all_client ${YAML_CPP_LIBRARIES})

@@ -68,6 +68,33 @@ bool Mutator::check_node_num(IR *root, unsigned int limit) {
   return is_good;
 }
 
+// 간단한 디버깅 출력 함수 추가
+void debug_log(const std::string &message) {
+  std::cout << "[DEBUG] " << message << std::endl;
+}
+
+void debug_log_ptr(const std::string &var_name, void *ptr) {
+  if (ptr) {
+    std::cout << "[DEBUG] " << var_name << " is valid." << std::endl;
+  } else {
+    std::cout << "[DEBUG] " << var_name << " is nullptr!" << std::endl;
+  }
+}
+
+void debug_log_vector_size(const std::string &var_name, size_t size) {
+  std::cout << "[DEBUG] " << var_name << " size: " << size << std::endl;
+}
+
+void debug_log_ir_info(const IR *ir) {
+  if (ir) {
+    std::cout << "[DEBUG] IR Info: Type = " << ir->type_
+              << ", str_val_ = " << ir->str_val_ << ", name_ = " << ir->name_
+              << std::endl;
+  } else {
+    std::cout << "[DEBUG] IR pointer is nullptr!" << std::endl;
+  }
+}
+
 vector<IR *> Mutator::mutate_all(vector<IR *> &v_ir_collector) {
   vector<IR *> res;
   set<unsigned long> res_hash;
@@ -794,11 +821,11 @@ unsigned long Mutator::hash(string sql) {
 
 unsigned long Mutator::hash(IR *root) { return this->hash(root->to_string()); }
 
-void Mutator::debug(IR *root) {
-  cout << get_string_by_type(root->type_) << endl;
-  if (root->left_) debug(root->left_);
-  if (root->right_) debug(root->right_);
-}
+// void Mutator::debug(IR *root) {
+//   cout << get_string_by_type(root->type_) << endl;
+//   if (root->left_) debug(root->left_);
+//   if (root->right_) debug(root->right_);
+// }
 
 Mutator::~Mutator() {
   cout << "HERE" << endl;
@@ -1157,4 +1184,148 @@ int Mutator::try_fix(char *buf, int len, char *&new_buf, int &new_len) {
   new_len = fixed.size();
 
   return 1;
+}
+
+#include <iostream>
+#include <string>
+#include <vector>
+
+std::string get_string_by_idtype(IDTYPE type) {
+  switch (type) {
+    case id_whatever:
+      return "whatever";
+    case id_top_table_name:
+      return "top_table_name";
+    case id_column_name:
+      return "column_name";
+    case id_table_name:
+      return "table_name";
+    case id_create_table_name:
+      return "create_table_name";
+    case id_create_column_name:
+      return "create_column_name";
+    case id_schema_name:
+      return "schema_name";
+    case id_pragma_name:
+      return "pragma_name";
+    case id_pragma_value:
+      return "pragma_value";
+    case id_index_name:
+      return "index_name";
+    case id_trigger_name:
+      return "trigger_name";
+    case id_module_name:
+      return "module_name";
+    case id_window_def_name:
+      return "window_def_name";
+    case id_window_name:
+      return "window_name";
+    case id_window_base_name:
+      return "window_base_name";
+    case id_savepoint_name:
+      return "savepoint_name";
+    case id_collation_name:
+      return "collation_name";
+    case id_database_name:
+      return "database_name";
+    default:
+      return "Unknown IDTYPE";
+  }
+}
+
+// IRTYPE을 문자열로 변환하는 함수
+std::string get_string_by_IRtype(IRTYPE type) {
+  switch (type) {
+#define DECLARE_CASE(v) \
+  case v:               \
+    return #v;
+    ALLTYPE(DECLARE_CASE)
+#undef DECLARE_CASE
+
+    default:
+      return "Unknown IRTYPE";
+  }
+}
+
+// 길이가 긴 문자열을 자르는 함수
+std::string shorten_string(const std::string &str,
+                           std::size_t max_length = 50) {
+  if (str.length() > max_length) {
+    return str.substr(0, max_length) + "...";  // 문자열을 자르고 '...' 추가
+  }
+  return str;
+}
+
+void Mutator::debug(IR *root, int level, bool is_left, bool is_root) {
+  if (!root) return;
+
+  // 깊이에 따른 탭 들여쓰기
+  std::string indent(level, '\n.');
+
+  // 노드 정보를 출력
+  if (is_root) {
+    std::cout << indent << "\nRoot Node (Depth " << level
+              << "): " << get_string_by_IRtype(root->type_) << "\n";
+  } else {
+    std::cout << indent
+              << (is_left ? "Left Child (Depth " : "Right Child (Depth ")
+              << level << "): " << get_string_by_IRtype(root->type_) << "\n";
+  }
+
+  // 추가 정보 출력 (DataType, DataFlag, Core String 등)
+  std::cout << indent << "IDTYPE: " << get_string_by_idtype(root->id_type_)
+            << "\n";
+  std::cout << indent << "Mutated Times: " << root->mutated_times_ << "\n";
+  std::cout << indent << "SQL String: " << shorten_string(root->str_val_)
+            << "\n\n";
+
+  // 왼쪽 자식을 재귀적으로 출력
+  if (root->left_) {
+    debug(root->left_, level + 1, true, false);
+  }
+
+  // 오른쪽 자식을 재귀적으로 출력
+  if (root->right_) {
+    debug(root->right_, level + 1, false, false);
+  }
+}
+
+#include <cassert>
+#include <iostream>
+
+std::string Mutator::show_struct(IR *root, int level, bool is_left,
+                                 bool is_root) {
+  // null 체크: root가 null이면 assert 발동, "N/A" 반환
+  assert(root && "Error: Attempted to access a null IR node!");
+
+  if (!root) {
+    std::cerr << "Error: Null node encountered at level " << level << std::endl;
+    return "N/A";  // 자식 노드가 없을 경우 "N/A" 리턴
+  }
+
+  // 노드의 현재 타입 가져오기
+  std::string current_node = get_string_by_IRtype(root->type_) +
+                             "::" + root->str_val_ + "::" + root->name_;
+  std::cout << "IR Node Debug: Type = " << get_string_by_IRtype(root->type_)
+            << ", str_val_ = " << root->str_val_ << ", name_ = " << root->name_
+            << std::endl;
+
+  // 왼쪽 자식과 오른쪽 자식을 각각 재귀적으로 처리
+  std::string left_child =
+      (root->left_ ? show_struct(root->left_, level + 1, true, false) : "N/A");
+  std::string right_child =
+      (root->right_ ? show_struct(root->right_, level + 1, false, false)
+                    : "N/A");
+
+  // 자식 노드가 존재하는 경우 형식에 맞춰 문자열 조합
+  if (left_child != "N/A" && right_child != "N/A") {
+    return current_node + "[" + left_child + "]" + "[" + right_child + "]";
+  } else if (left_child != "N/A") {
+    return current_node + "[" + left_child + "]";
+  } else if (right_child != "N/A") {
+    return current_node + "[" + right_child + "]";
+  } else {
+    // 자식이 없는 경우 리프 노드로만 출력
+    return current_node;
+  }
 }

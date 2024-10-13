@@ -6,8 +6,10 @@
 #include "ast.h"
 #include "define.h"
 #include "mutator.h"
+#include "transpile.h"
 #include "utils.h"
 
+extern std::ofstream outfile;
 SQLiteDB *create_sqlite() { return new SQLiteDB; }
 SQLiteDB::SQLiteDB() { mutator_ = std::make_unique<Mutator>(); }
 
@@ -41,36 +43,45 @@ bool SQLiteDB::save_interesting_query(const std::string &query) {
       deep_delete(root_ir);
     }
     return true;
+  } else {
+    std::cerr << "Error: SQL parser returned null for query: " << query
+              << "?????" << std::endl;
+    return false;
   }
-  return false;
 }
 
-size_t SQLiteDB::validate_all(const std::vector<IR *> &ir_set) {
+std::vector<std::string> SQLiteDB::validate_all(
+    const std::vector<IR *> &ir_set) {
+  std::vector<std::string> validated_queries;
+
   for (IR *ir : ir_set) {
     std::string validated_ir = mutator_->validate(ir);
     if (validated_ir.empty()) {
       continue;
     }
-    validated_test_cases_.push(std::move(validated_ir));
+    validated_queries.push_back(
+        std::move(validated_ir));  // 벡터에 validated query 저장
   }
-  return validated_test_cases_.size();
+
+  return validated_queries;  // validated queries 반환
 }
 
 bool SQLiteDB::has_mutated_test_cases() {
   return !validated_test_cases_.empty();
 }
 
-size_t SQLiteDB::mutate(const std::string &query) {
+size_t SQLiteDB::mutate(Round &r) {
   std::vector<IR *> ir_set, mutated_tree;
-  Program *program_root = parser(query.c_str());
+  Program *program_root = parser(r.buf_queries);
   if (program_root == nullptr) {
     return 0;
   }
-
+  outfile << YELLOW << "[Parsing src_query]" << RESET << std::endl;
   // TODO: Remove this uncessary try.
   // Or we will have exception from the parser?
   try {
     program_root->translate(ir_set);
+    outfile << YELLOW << "[Translate AST -> IR]" << RESET << std::endl;
   } catch (...) {
     for (auto ir : ir_set) {
       delete ir;
@@ -80,19 +91,71 @@ size_t SQLiteDB::mutate(const std::string &query) {
   program_root->deep_delete();
 
   mutated_tree = mutator_->mutate_all(ir_set);
+  outfile << YELLOW << "[Mutate IR]" << RESET << std::endl;
   deep_delete(ir_set[ir_set.size() - 1]);
 
-  size_t validated_ir_size = validate_all(mutated_tree);
+  std::vector<std::string> validated_queries = validate_all(mutated_tree);
+  outfile << YELLOW << "[Validate mutated IR]" << RESET << std::endl;
+  QueryQueue q;
+  OraclePlan *plan;
+  // 각 타겟에 맞는 쿼리로 변환하여 QueryQueue에 추가
+  int i = 1;
+  for (const auto &validated_query : validated_queries) {
+    outfile << "\n\n"
+            << YELLOW << "[" << i++ << "th test case start!!!!!]" << RESET
+            << std::endl;
+    q = transpile(validated_query, TARGET_ALL);  // 각 DBMS에 맞게 쿼리 변환
+    outfile << YELLOW << "[Query transpile to suit each DBMS]" << RESET
+            << std::endl;
+    // std::cout << "  single_query: " << single_query << std::endl;
+
+    outfile << MAGENTA << "src_query: " << validated_query << std::endl;
+    outfile << "Contents of QueryQueue (q):\n";
+    for (const auto &entry : q) {
+      Target target = entry.first;
+      const std::string &query = entry.second;
+      outfile << "Target: " << target_to_string(target) << "\n";
+      outfile << "\tQuery: " << query << "\n";
+    }
+    // OraclePlan 생성 및 테스트 케이스에 추가
+    plan = oracle_planner(validated_query, &q);
+    outfile << YELLOW << "[Create OraclePlan]" << RESET << std::endl;
+    outfile << BRIGHT_BLUE << plan->to_string() << RESET << std::endl;
+
+    postprocess(plan, decode(&r));
+    outfile << YELLOW << "[Postprocess]" << RESET << std::endl;
+    outfile << CYAN << plan->to_string() << RESET << std::endl;
+
+    outfile << YELLOW << "[Push only if the Plan is valid after validation]"
+            << RESET << std::endl;
+
+    if (plan && plan->is_valid()) {
+      validated_test_cases_.push(encode(plan));  // Plan이 유효한 경우에만 push
+      outfile << GREEN << "[ Original query before mutation:  " << r.buf_queries
+              << "]" << RESET << std::endl;
+      outfile << GREEN
+              << "[ mutated query: " << validated_test_cases_.top()->buf_queries
+              << "]" << RESET << std::endl;
+    }
+  }
+
+  if (validated_test_cases_.empty()) {
+    outfile << RED << "[No validated test cases available.]" << RESET
+            << std::endl;
+  }
+
+  size_t validated_ir_size = validated_test_cases_.size();
   for (auto ir : mutated_tree) {
     deep_delete(ir);
   }
 
   // std::cerr << "validated ir size: " << validated_ir_size << std::endl;
-
+  outfile << "[mutated queries num: " << validated_test_cases_.size() << "]"
+          << std::endl;
   return validated_ir_size;
 }
 
-std::string SQLiteDB::get_next_mutated_query() {
+Round *SQLiteDB::get_next_mutated_query() {
   auto result = validated_test_cases_.top();
   validated_test_cases_.pop();
   return result;

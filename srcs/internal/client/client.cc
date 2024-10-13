@@ -1,8 +1,8 @@
 #include "client.h"
 
 #include <cassert>
-#include <string>
 #include <iostream>
+#include <string>
 
 #ifdef __SQUIRREL_MYSQL__
 #include "client_mysql.h"
@@ -46,10 +46,10 @@ DBClient *create_client(const std::string &db_name, const YAML::Node &config) {
 #endif
   }
 
-  assert(result && "It is not supported!");  // 지원되지 않는 클라이언트에 대한 오류 처리
+  assert(result &&
+         "It is not supported!");  // 지원되지 않는 클라이언트에 대한 오류 처리
   result->initialize(config);  // 초기화
   return result;
 }
 
 };  // namespace client
-

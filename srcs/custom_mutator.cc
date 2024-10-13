@@ -8,18 +8,18 @@
 #include "afl-fuzz.h"
 #include "config_validate.h"
 #include "db.h"
+#include "protocol.h"
 #include "yaml-cpp/yaml.h"
 
 struct SquirrelMutator {
   SquirrelMutator(DataBase *db) : database(db) {}
   ~SquirrelMutator() { delete database; }
   DataBase *database;
-  std::string current_input;
+  Round *current_input;
 };
+std::ofstream outfile;
 
 extern "C" {
-
-
 void *afl_custom_init(afl_state_t *afl, unsigned int seed) {
   std::string basedir = getenv("HOME");
   basedir += "/QueryHouse";
@@ -47,10 +47,8 @@ u8 afl_custom_queue_new_entry(SquirrelMutator *mutator,
   return false;
 }
 
-unsigned int afl_custom_fuzz_count(SquirrelMutator *mutator,
-                                   const unsigned char *buf, size_t buf_size) {
-  std::string sql((const char *)buf, buf_size);
-  return mutator->database->mutate(sql);
+unsigned int afl_custom_fuzz_count(SquirrelMutator *mutator, Round r) {
+  return mutator->database->mutate(r);
 }
 
 size_t afl_custom_fuzz(SquirrelMutator *mutator, uint8_t *buf, size_t buf_size,
@@ -60,7 +58,7 @@ size_t afl_custom_fuzz(SquirrelMutator *mutator, uint8_t *buf, size_t buf_size,
   DataBase *db = mutator->database;
   assert(db->has_mutated_test_cases());
   mutator->current_input = db->get_next_mutated_query();
-  *out_buf = (u8 *)mutator->current_input.c_str();
-  return mutator->current_input.size();
+  *out_buf = (u8 *)mutator->current_input->buf_queries;
+  return MAX_ROUND_SIZE;
 }
 }

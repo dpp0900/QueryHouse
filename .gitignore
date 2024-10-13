@@ -1,14 +1,9 @@
-build
-mysql_bld
-postgres_bld
-sqlite_bld
 output
 .cache
 Testing
 opt
 *.deb
 *.rpm
-afl_bld
-mysql_afl_bld
-build_no_afl
-sqlite_afl_bld
+build*
+*bld
+.prettierrc
