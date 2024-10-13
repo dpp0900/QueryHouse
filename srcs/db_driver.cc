@@ -31,8 +31,8 @@
 using namespace std;
 namespace py = pybind11;
 
-ofstream outfile("out/output.txt");
-ofstream errfile("out/error_log.txt");
+ofstream outfile("/tmp/output.txt");
+ofstream errfile("/tmp/error_log.txt");
 
 void print_buf_queries(const char *buf, size_t length = 0x100) {
   cout << "buf_queries (first " << length << " bytes):" << endl;
@@ -218,6 +218,15 @@ int main(int argc, char *argv[]) {
   string config_file_path = basedir + "/data/config/";
   vector<string> config_files;
 
+  // log to tmp
+  FILE *fp = fopen("/tmp/db_driver_log", "a");
+  if (fp == NULL) {
+    perror("fopen");
+    return 1;
+  }
+  fprintf(fp, "log to tmp\n");
+  fclose(fp);
+
   for (const auto &entry : filesystem::directory_iterator(config_file_path)) {
     config_files.push_back(entry.path());
     cout << "Load config file: " << entry.path() << endl;
@@ -251,7 +260,7 @@ int main(int argc, char *argv[]) {
   // Start the database server. In case that the driver
   // is stopped and restarted, we should not start another server.
   __afl_map_shm();
-
+  outfile << YELLOW << "[afl_map_shm]" << RESET << endl;
   for (auto &db_client : db_clients) {
     if (!db_client->check_alive()) {
       cout << "DB Client is not alive." << endl;
@@ -262,8 +271,16 @@ int main(int argc, char *argv[]) {
     }
   }
   __afl_start_forkserver();
+
+  outfile << YELLOW << "[afl_start_forkserver]" << RESET << endl;
+  len = __afl_next_testcase(buf, kMaxInputSize);
+  __afl_end_testcase(client::kNormal);
   while ((len = __afl_next_testcase(buf, kMaxInputSize)) > 0) {
+    outfile << YELLOW << "[__afl_next_testcase]" << RESET << endl;
+    outfile << "Received test case: " << buf << endl;
     Round *r = (Round *)buf;
+    outfile << YELLOW << "[Round]" << RESET << endl;
+    outfile << "Round: " << r << endl;
     OraclePlan *p = decode(r);
     outfile << YELLOW << "[Decode Round->OraclePlan]" << RESET << endl;
     if (p) {

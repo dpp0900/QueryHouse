@@ -236,6 +236,7 @@ Round *encode(OraclePlan *plan) {
  * used to execute.
  */
 OraclePlan *decode(Round *r) {
+  outfile << YELLOW << "[Decode Round->OraclePlan]" << RESET << std::endl;
   // Ensure that the round object is valid
   if (r == NULL) {
     printf("\n[ERROR] Null pointer received for Round.\n");
@@ -243,7 +244,9 @@ OraclePlan *decode(Round *r) {
   }
   // Initialize OraclePlan with the original query from buf_queries
   std::string src_query = std::string(r->buf_queries);
+  // outfile << "src_query: " << src_query << std::endl;
   OraclePlan *plan = new OraclePlan(src_query);
+  outfile << YELLOW << "[Create OraclePlan]" << RESET << std::endl;
 
   // Set the oracle_plan from Round
   for (int i = 0; i < r->num_oracle; i++) {
@@ -259,6 +262,7 @@ OraclePlan *decode(Round *r) {
 
       // Copy queries
       for (char *q : get_querylist(r, static_cast<Target>(db))) {
+        outfile << "Query: " << q << std::endl;
         qinfo.queries.push_back(std::string(q));
       }
 
@@ -268,6 +272,7 @@ OraclePlan *decode(Round *r) {
   }
 
   // Return the decoded OraclePlan object
+  outfile << CYAN << plan->to_string() << RESET << std::endl;
   return plan;
 }
 

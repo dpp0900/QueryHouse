@@ -31,6 +31,7 @@ def set_env(database):
   os.environ["ORACLE_BASE"] = "/opt/oracle"
   os.environ["LD_LIBRARY_PATH"] = os.environ["ORACLE_HOME"] + "/lib" + ":" + (os.environ["LD_LIBRARY_PATH"] if "LD_LIBRARY_PATH" in os.environ else "")
   os.environ["PATH"] = os.environ["ORACLE_HOME"] + "/bin" + ":" + os.environ["PATH"]
+  os.environ["AFL_NO_UI"] = "1"
 
 
 def run(database, input_dir, output_dir=None, config_file=None, fuzzer=None):
