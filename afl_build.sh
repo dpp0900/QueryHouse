@@ -80,7 +80,7 @@ SQLITE_END_TIME=$(date +%s)
 # driver 빌드
 cd $BASE_DIR
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -Wno-dev -DORACLE=ON
-cmake --build build
+cmake --build build -j
 
 DRIVER_END_TIME=$(date +%s)
 

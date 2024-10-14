@@ -1,12 +1,16 @@
 #include "client_oracle.h"
 
-#include <iostream>
 #include <oci.h>
+
+#include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
 
 using namespace std;
 
+std::fstream oracle_logfile("/tmp/oracle_log.txt",
+                            std::ios::out | std::ios::app);
 namespace client {
 
 void OracleClient::initialize(YAML::Node config) {
@@ -21,144 +25,165 @@ void OracleClient::initialize(YAML::Node config) {
 void OracleClient::prepare_env() {
   ++database_id_;
   std::string schema_name = db_prefix_ + std::to_string(database_id_);
-  
+
   // 스키마 생성
   if (!create_schema(schema_name)) {
-    std::cerr << "Failed to create schema." << std::endl;
+    oracle_logfile << "Failed to create schema." << std::endl;
   } else {
     // 새로 만든 스키마 이름 저장
     default_schema_ = "C##" + schema_name;
   }
+
+  FILE *fp = fopen("/tmp/oracle_log.txt", "a");
+  if (fp == NULL) {
+    perror("fopen");
+  } else {
+    fprintf(fp, "Prepared environment with schema: %s\n", schema_name.c_str());
+    fclose(fp);
+  }
 }
 
-ExecutionStatus OracleClient::execute(const char *query, size_t size, std::vector<std::vector<std::string>> &result) {
-    std::vector<std::string> queries = split_query(query, size);
-    for (auto &q : queries) {
-        if (q.back() == ';') {
-            q.pop_back();
-        }
+ExecutionStatus OracleClient::execute(
+    const char *query, size_t size,
+    std::vector<std::vector<std::string>> &result) {
+  // cerr as a log file
+  std::vector<std::string> queries = split_query(query, size);
+  for (auto &q : queries) {
+    if (q.back() == ';') {
+      q.pop_back();
     }
-    
-    OCIEnv *env = nullptr;
-    OCIError *err = nullptr;
-    OCISvcCtx *svc = nullptr;
-    OCIDefine *defn = nullptr;
+  }
 
+  OCIEnv *env = nullptr;
+  OCIError *err = nullptr;
+  OCISvcCtx *svc = nullptr;
+  OCIDefine *defn = nullptr;
 
-    if (!create_connection(env, err, svc)) {
-        std::cerr << "Cannot create connection at execute" << std::endl;
-        return kServerCrash;
-    }
+  if (!create_connection(env, err, svc)) {
+    oracle_logfile << "Cannot create connection at execute" << std::endl;
+    return kServerCrash;
+  }
 
-    for (const auto &q : queries) {
-        std::cout << "[Oracle] Execute query: " << q << std::endl;
-        OCIStmt *stmt = nullptr;
-        OCIHandleAlloc(env, (void **)&stmt, OCI_HTYPE_STMT, 0, nullptr);
+  for (const auto &q : queries) {
+    oracle_logfile << "[Oracle] Execute query: " << q << std::endl;
+    OCIStmt *stmt = nullptr;
+    OCIHandleAlloc(env, (void **)&stmt, OCI_HTYPE_STMT, 0, nullptr);
 
-        if (OCIStmtPrepare(stmt, err, (text *)q.c_str(), (ub4)q.size(), OCI_NTV_SYNTAX, OCI_DEFAULT) != OCI_SUCCESS) {
-            std::cerr << "Failed to prepare statement" << std::endl;
+    if (OCIStmtPrepare(stmt, err, (text *)q.c_str(), (ub4)q.size(),
+                       OCI_NTV_SYNTAX, OCI_DEFAULT) != OCI_SUCCESS) {
+      oracle_logfile << "Failed to prepare statement" << std::endl;
 
-            // Retrieve detailed error message
-            text errbuf[512];
-            sb4 errcode;
-            OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf), OCI_HTYPE_ERROR);
-            std::cerr << "Error - " << errbuf << std::endl;
+      // Retrieve detailed error message
+      text errbuf[512];
+      sb4 errcode;
+      OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf),
+                  OCI_HTYPE_ERROR);
+      oracle_logfile << "Error - " << errbuf << std::endl;
 
-            clean_up_connection(env, err, svc);
-            return kSyntaxError;
-        }
-
-        // Check if it's a SELECT statement
-        if (q.find("SELECT") != std::string::npos) {
-            if (OCIStmtExecute(svc, stmt, err, 0, 0, nullptr, nullptr, OCI_DESCRIBE_ONLY) != OCI_SUCCESS) {
-                std::cerr << "Failed to execute DESCRIBE query" << std::endl;
-
-                // Retrieve detailed error message
-                text errbuf[512];
-                sb4 errcode;
-                OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf), OCI_HTYPE_ERROR);
-                std::cerr << "Error - " << errbuf << std::endl;
-
-                clean_up_connection(env, err, svc);
-                return kSemanticError;
-            }
-            ub4 columnCount;
-            if (OCIAttrGet(stmt, OCI_HTYPE_STMT, &columnCount, 0, OCI_ATTR_PARAM_COUNT, err) != OCI_SUCCESS) {
-                std::cerr << "Failed to get column count" << std::endl;
-
-                // Retrieve detailed error message
-                text errbuf[512];
-                sb4 errcode;
-                OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf), OCI_HTYPE_ERROR);
-                std::cerr << "Error - " << errbuf << std::endl;
-
-                clean_up_connection(env, err, svc);
-                return kSemanticError;
-            }
-            std::cout << "Column count: " << columnCount << std::endl;
-            
-            char result_string[1024][1024];            
-
-            for (ub4 i = 1; i <= columnCount; i++) {
-              
-                if(OCIDefineByPos(stmt, &defn, err, i, result_string[i], 1024, SQLT_STR, nullptr, nullptr, nullptr, OCI_DEFAULT) != OCI_SUCCESS) {
-                    std::cerr << "Failed to define column " << i << std::endl;
-
-                    // Retrieve detailed error message
-                    text errbuf[512];
-                    sb4 errcode;
-                    OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf), OCI_HTYPE_ERROR);
-                    std::cerr << "Error - " << errbuf << std::endl;
-
-                    clean_up_connection(env, err, svc);
-                    return kSemanticError;
-                }
-            }
-
-            // Execute the query
-            if (OCIStmtExecute(svc, stmt, err, 0, 0, nullptr, nullptr, OCI_DEFAULT) != OCI_SUCCESS) {
-                std::cerr << "Failed to execute SELECT query" << std::endl;
-
-                // Retrieve detailed error message
-                text errbuf[512];
-                sb4 errcode;
-                OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf), OCI_HTYPE_ERROR);
-                std::cerr << "Error - " << errbuf << std::endl;
-
-                clean_up_connection(env, err, svc);
-                return kSemanticError;
-            }
-            while (OCIStmtFetch2(stmt, err, 1, OCI_FETCH_NEXT, 0, OCI_DEFAULT) == OCI_SUCCESS) {
-                std::vector<std::string> row;
-                for (ub4 i = 1; i <= columnCount; i++) {
-                    row.push_back(result_string[i]);
-                }
-                result.push_back(row);
-            }
-        } else {
-            // For non-SELECT statements, simply execute
-            if (OCIStmtExecute(svc, stmt, err, 1, 0, nullptr, nullptr, OCI_DEFAULT) != OCI_SUCCESS) {
-                std::cerr << "Failed to execute non-SELECT query" << std::endl;
-
-                // Retrieve detailed error message
-                text errbuf[512];
-                sb4 errcode;
-                OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf), OCI_HTYPE_ERROR);
-                std::cerr << "Error - " << errbuf << std::endl;
-
-                clean_up_connection(env, err, svc);
-                return kSemanticError;
-            }
-        }
-
-        OCIHandleFree(stmt, OCI_HTYPE_STMT);
+      clean_up_connection(env, err, svc);
+      return kSyntaxError;
     }
 
-    clean_up_connection(env, err, svc);
-    return kNormal;
+    // Check if it's a SELECT statement
+    if (q.find("SELECT") != std::string::npos) {
+      if (OCIStmtExecute(svc, stmt, err, 0, 0, nullptr, nullptr,
+                         OCI_DESCRIBE_ONLY) != OCI_SUCCESS) {
+        oracle_logfile << "Failed to execute DESCRIBE query" << std::endl;
+
+        // Retrieve detailed error message
+        text errbuf[512];
+        sb4 errcode;
+        OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf),
+                    OCI_HTYPE_ERROR);
+        oracle_logfile << "Error - " << errbuf << std::endl;
+
+        clean_up_connection(env, err, svc);
+        return kSemanticError;
+      }
+      ub4 columnCount;
+      if (OCIAttrGet(stmt, OCI_HTYPE_STMT, &columnCount, 0,
+                     OCI_ATTR_PARAM_COUNT, err) != OCI_SUCCESS) {
+        oracle_logfile << "Failed to get column count" << std::endl;
+
+        // Retrieve detailed error message
+        text errbuf[512];
+        sb4 errcode;
+        OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf),
+                    OCI_HTYPE_ERROR);
+        oracle_logfile << "Error - " << errbuf << std::endl;
+
+        clean_up_connection(env, err, svc);
+        return kSemanticError;
+      }
+      oracle_logfile << "Column count: " << columnCount << std::endl;
+
+      char result_string[1024][1024];
+
+      for (ub4 i = 1; i <= columnCount; i++) {
+        if (OCIDefineByPos(stmt, &defn, err, i, result_string[i], 1024,
+                           SQLT_STR, nullptr, nullptr, nullptr,
+                           OCI_DEFAULT) != OCI_SUCCESS) {
+          oracle_logfile << "Failed to define column " << i << std::endl;
+
+          // Retrieve detailed error message
+          text errbuf[512];
+          sb4 errcode;
+          OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf),
+                      OCI_HTYPE_ERROR);
+          oracle_logfile << "Error - " << errbuf << std::endl;
+
+          clean_up_connection(env, err, svc);
+          return kSemanticError;
+        }
+      }
+
+      // Execute the query
+      if (OCIStmtExecute(svc, stmt, err, 0, 0, nullptr, nullptr, OCI_DEFAULT) !=
+          OCI_SUCCESS) {
+        oracle_logfile << "Failed to execute SELECT query" << std::endl;
+
+        // Retrieve detailed error message
+        text errbuf[512];
+        sb4 errcode;
+        OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf),
+                    OCI_HTYPE_ERROR);
+        oracle_logfile << "Error - " << errbuf << std::endl;
+
+        clean_up_connection(env, err, svc);
+        return kSemanticError;
+      }
+      while (OCIStmtFetch2(stmt, err, 1, OCI_FETCH_NEXT, 0, OCI_DEFAULT) ==
+             OCI_SUCCESS) {
+        std::vector<std::string> row;
+        for (ub4 i = 1; i <= columnCount; i++) {
+          row.push_back(result_string[i]);
+        }
+        result.push_back(row);
+      }
+    } else {
+      // For non-SELECT statements, simply execute
+      if (OCIStmtExecute(svc, stmt, err, 1, 0, nullptr, nullptr, OCI_DEFAULT) !=
+          OCI_SUCCESS) {
+        oracle_logfile << "Failed to execute non-SELECT query" << std::endl;
+
+        // Retrieve detailed error message
+        text errbuf[512];
+        sb4 errcode;
+        OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf),
+                    OCI_HTYPE_ERROR);
+        oracle_logfile << "Error - " << errbuf << std::endl;
+
+        clean_up_connection(env, err, svc);
+        return kSemanticError;
+      }
+    }
+
+    OCIHandleFree(stmt, OCI_HTYPE_STMT);
+  }
+
+  clean_up_connection(env, err, svc);
+  return kNormal;
 }
-
-
 
 void OracleClient::clean_up_env() {
   std::string schema_name = db_prefix_ + std::to_string(database_id_);
@@ -166,8 +191,8 @@ void OracleClient::clean_up_env() {
   std::string common_user_name = prefix + schema_name;
   std::string drop_query = "DROP USER " + common_user_name + " CASCADE";
 
-  std::cout << "Dropping schema: " << drop_query << std::endl;
-  
+  oracle_logfile << "Dropping schema: " << drop_query << std::endl;
+
   OCIEnv *env = nullptr;
   OCIError *err = nullptr;
   OCISvcCtx *svc = nullptr;
@@ -175,7 +200,8 @@ void OracleClient::clean_up_env() {
   if (create_connection(env, err, svc)) {
     OCIStmt *stmt = nullptr;
     OCIHandleAlloc(env, (void **)&stmt, OCI_HTYPE_STMT, 0, nullptr);
-    OCIStmtPrepare(stmt, err, (text *)drop_query.c_str(), (ub4)drop_query.size(), OCI_NTV_SYNTAX, OCI_DEFAULT);
+    OCIStmtPrepare(stmt, err, (text *)drop_query.c_str(),
+                   (ub4)drop_query.size(), OCI_NTV_SYNTAX, OCI_DEFAULT);
     OCIStmtExecute(svc, stmt, err, 1, 0, nullptr, nullptr, OCI_DEFAULT);
     OCIHandleFree(stmt, OCI_HTYPE_STMT);
     clean_up_connection(env, err, svc);
@@ -196,7 +222,8 @@ bool OracleClient::check_alive() {
 
 bool OracleClient::create_schema(const std::string &schema_name) {
   std::string common_user_name = "C##" + schema_name;
-  std::string create_user_query = "CREATE USER " + common_user_name + " IDENTIFIED BY password";
+  std::string create_user_query =
+      "CREATE USER " + common_user_name + " IDENTIFIED BY password";
   std::string grant_query = "GRANT ALL PRIVILEGES TO " + common_user_name;
 
   OCIEnv *env = nullptr;
@@ -211,43 +238,51 @@ bool OracleClient::create_schema(const std::string &schema_name) {
   OCIHandleAlloc(env, (void **)&stmt, OCI_HTYPE_STMT, 0, nullptr);
 
   // Try to execute the "CREATE USER" query
-  if (OCIStmtPrepare(stmt, err, (text *)create_user_query.c_str(), (ub4)create_user_query.size(), OCI_NTV_SYNTAX, OCI_DEFAULT) != OCI_SUCCESS) {
-    std::cerr << "Failed to prepare CREATE USER statement" << std::endl;
+  if (OCIStmtPrepare(stmt, err, (text *)create_user_query.c_str(),
+                     (ub4)create_user_query.size(), OCI_NTV_SYNTAX,
+                     OCI_DEFAULT) != OCI_SUCCESS) {
+    oracle_logfile << "Failed to prepare CREATE USER statement" << std::endl;
     clean_up_connection(env, err, svc);
     return false;
   }
 
-  if (OCIStmtExecute(svc, stmt, err, 1, 0, nullptr, nullptr, OCI_DEFAULT) != OCI_SUCCESS) {
-    std::cerr << "Failed to create schema" << std::endl;
-    
+  if (OCIStmtExecute(svc, stmt, err, 1, 0, nullptr, nullptr, OCI_DEFAULT) !=
+      OCI_SUCCESS) {
+    oracle_logfile << "Failed to create schema" << std::endl;
+
     // Retrieve detailed error message
     text errbuf[512];
     sb4 errcode;
-    OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf), OCI_HTYPE_ERROR);
-    std::cerr << "Error - " << errbuf << std::endl;
-    
+    OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf),
+                OCI_HTYPE_ERROR);
+    oracle_logfile << "Error - " << errbuf << std::endl;
+
     clean_up_connection(env, err, svc);
     return false;
   }
 
   // Grant privileges
-  if (OCIStmtPrepare(stmt, err, (text *)grant_query.c_str(), (ub4)grant_query.size(), OCI_NTV_SYNTAX, OCI_DEFAULT) != OCI_SUCCESS) {
-    std::cerr << "Failed to prepare GRANT statement" << std::endl;
+  if (OCIStmtPrepare(stmt, err, (text *)grant_query.c_str(),
+                     (ub4)grant_query.size(), OCI_NTV_SYNTAX,
+                     OCI_DEFAULT) != OCI_SUCCESS) {
+    oracle_logfile << "Failed to prepare GRANT statement" << std::endl;
     clean_up_connection(env, err, svc);
     return false;
   }
 
   OCIStmtExecute(svc, stmt, err, 1, 0, nullptr, nullptr, OCI_DEFAULT);
   OCIHandleFree(stmt, OCI_HTYPE_STMT);
-  
+
   clean_up_connection(env, err, svc);
   return true;
 }
 
-bool OracleClient::create_connection(OCIEnv *&env, OCIError *&err, OCISvcCtx *&svc) {
+bool OracleClient::create_connection(OCIEnv *&env, OCIError *&err,
+                                     OCISvcCtx *&svc) {
   // Initialize OCI environment
-  if (OCIEnvCreate(&env, OCI_DEFAULT, nullptr, nullptr, nullptr, nullptr, 0, nullptr) != OCI_SUCCESS) {
-    std::cerr << "Failed to create OCI environment" << std::endl;
+  if (OCIEnvCreate(&env, OCI_DEFAULT, nullptr, nullptr, nullptr, nullptr, 0,
+                   nullptr) != OCI_SUCCESS) {
+    oracle_logfile << "Failed to create OCI environment" << std::endl;
     return false;
   }
 
@@ -258,9 +293,11 @@ bool OracleClient::create_connection(OCIEnv *&env, OCIError *&err, OCISvcCtx *&s
   std::string conn_string = "//" + host_ + ":" + port_ + "/" + service_;
 
   // Log in to the database
-  if (OCILogon(env, err, &svc, (text *)user_name_.c_str(), (ub4)user_name_.size(),
-               (text *)passwd_.c_str(), (ub4)passwd_.size(), (text *)conn_string.c_str(), (ub4)conn_string.size()) != OCI_SUCCESS) {
-    std::cerr << "Failed to connect to Oracle database" << std::endl;
+  if (OCILogon(env, err, &svc, (text *)user_name_.c_str(),
+               (ub4)user_name_.size(), (text *)passwd_.c_str(),
+               (ub4)passwd_.size(), (text *)conn_string.c_str(),
+               (ub4)conn_string.size()) != OCI_SUCCESS) {
+    oracle_logfile << "Failed to connect to Oracle database" << std::endl;
     OCIHandleFree(err, OCI_HTYPE_ERROR);
     OCIHandleFree(env, OCI_HTYPE_ENV);
     return false;
@@ -268,11 +305,15 @@ bool OracleClient::create_connection(OCIEnv *&env, OCIError *&err, OCISvcCtx *&s
 
   // Change schema to the newly created schema
   if (!default_schema_.empty()) {
-    std::string alter_schema_query = "ALTER SESSION SET CURRENT_SCHEMA = " + default_schema_;
+    std::string alter_schema_query =
+        "ALTER SESSION SET CURRENT_SCHEMA = " + default_schema_;
+    oracle_logfile << "Changing schema to " << default_schema_ << std::endl;
     OCIStmt *stmt = nullptr;
     OCIHandleAlloc(env, (void **)&stmt, OCI_HTYPE_STMT, 0, nullptr);
-    if (OCIStmtPrepare(stmt, err, (text *)alter_schema_query.c_str(), (ub4)alter_schema_query.size(), OCI_NTV_SYNTAX, OCI_DEFAULT) != OCI_SUCCESS) {
-      std::cerr << "Failed to change schema after connection" << std::endl;
+    if (OCIStmtPrepare(stmt, err, (text *)alter_schema_query.c_str(),
+                       (ub4)alter_schema_query.size(), OCI_NTV_SYNTAX,
+                       OCI_DEFAULT) != OCI_SUCCESS) {
+      oracle_logfile << "Failed to change schema after connection" << std::endl;
       OCIHandleFree(stmt, OCI_HTYPE_STMT);
       clean_up_connection(env, err, svc);
       return false;
@@ -284,7 +325,8 @@ bool OracleClient::create_connection(OCIEnv *&env, OCIError *&err, OCISvcCtx *&s
   return true;
 }
 
-ExecutionStatus OracleClient::clean_up_connection(OCIEnv *env, OCIError *err, OCISvcCtx *svc) {
+ExecutionStatus OracleClient::clean_up_connection(OCIEnv *env, OCIError *err,
+                                                  OCISvcCtx *svc) {
   if (svc) {
     OCILogoff(svc, err);
   }

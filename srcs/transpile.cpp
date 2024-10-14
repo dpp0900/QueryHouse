@@ -11,6 +11,7 @@
 
 // To use Python module in C++
 namespace py = pybind11;
+py::scoped_interpreter guard{};
 
 /***************************************
  * Transpiler
@@ -30,12 +31,15 @@ QueryQueue transpile(const std::string &query, TargetsMask targets) {
   // 먼저 전체 쿼리를 ;로 구분된 쿼리 조각으로 나눔
   std::vector<std::string> split_queries =
       split_query(query.c_str(), query.size());
+  std::cerr << "split_queries size: " << split_queries.size() << std::endl;
 
   // 각 쿼리 조각에 대해 DBMS별 변환을 수행
   for (const auto &single_query : split_queries) {
     for (Target &t : to_targets(targets)) {
       // 각각의 쿼리를 sqlglot을 통해 변환
+      std::cerr << "single_query: " << single_query << std::endl;
       std::string transpiled_query = transpile_for(single_query, t);
+      std::cerr << "transpiled_query: " << transpiled_query << std::endl;
 
       // 변환된 쿼리를 QueryQueue에 추가
       q[t] += transpiled_query + "; ";  // 변환 결과 추가 후 ;로 구분
@@ -87,7 +91,9 @@ std::vector<std::string> split_query(const char *buf, size_t len) {
  */
 std::string transpile_for(const std::string &query, Target target) {
   // Import the SQLglot module
+  std::cerr << "Importing sqlglot module" << std::endl;
   py::object sqlglot = py::module::import("sqlglot");
+  std::cerr << "Imported sqlglot module" << std::endl;
 
   // Set the appropriate dialect for the target
   std::string dialect;

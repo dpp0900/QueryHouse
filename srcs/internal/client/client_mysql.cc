@@ -34,16 +34,26 @@ void MySQLClient::prepare_env() {
   ++database_id_;
   std::string database_name = db_prefix_ + std::to_string(database_id_);
   if (!create_database(database_name)) {
-    std::cerr << "Failed to create database." << std::endl;
+    std::cout << "Failed to create database." << std::endl;
   }
 }
-ExecutionStatus MySQLClient::execute(const char *query, size_t size, std::vector<std::vector<std::string>> &result) {
+ExecutionStatus MySQLClient::execute(
+    const char *query, size_t size,
+    std::vector<std::vector<std::string>> &result) {
+  FILE *fp = fopen("/tmp/mysql_logsnvjklsn.txt", "a");
+  if (fp == NULL) {
+    perror("fopen");
+    return kServerCrash;
+  }
+  fprintf(fp, "log to tmp\n");
+  fclose(fp);
+  std::cout << "[MySQL] Executing queries..." << std::endl;
   // Create a connection for executing the query
   std::vector<std::string> queries = split_query(query, size);
   std::string database_name = db_prefix_ + std::to_string(database_id_);
   std::optional<MYSQL> connection = create_connection(database_name);
   if (!connection.has_value()) {
-    std::cerr << "Cannot create connection at execute" << std::endl;
+    std::cout << "Cannot create connection at execute" << std::endl;
     return kServerCrash;
   }
 
@@ -52,7 +62,7 @@ ExecutionStatus MySQLClient::execute(const char *query, size_t size, std::vector
     int server_response = mysql_real_query(&(*connection), q.c_str(), q.size());
 
     if (is_crash_response(server_response)) {
-      std::cerr << "MySQL query error" << std::endl;
+      std::cout << "MySQL query error" << std::endl;
       return kServerCrash;
     }
 
@@ -73,18 +83,24 @@ ExecutionStatus MySQLClient::execute(const char *query, size_t size, std::vector
 
     // Check for additional queries in multi-statement execution
     if (mysql_next_result(&(*connection)) > 0) {
-      std::cerr << "MySQL error while executing next query: " << mysql_error(&(*connection)) << std::endl;
+      std::cout << "MySQL error while executing next query: "
+                << mysql_error(&(*connection)) << std::endl;
       return kSyntaxError;
     }
   }
 
   // Retrieve schema information after query execution
   std::cout << "[MySQL] Retrieving schema information..." << std::endl;
-  std::string schema_query = "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = '" + database_name + "';";
-  int schema_response = mysql_real_query(&(*connection), schema_query.c_str(), schema_query.size());
+  std::string schema_query =
+      "SELECT table_name, table_type FROM information_schema.tables WHERE "
+      "table_schema = '" +
+      database_name + "';";
+  int schema_response = mysql_real_query(&(*connection), schema_query.c_str(),
+                                         schema_query.size());
 
   if (schema_response != 0) {
-    std::cerr << "MySQL error retrieving schema: " << mysql_error(&(*connection)) << std::endl;
+    std::cout << "MySQL error retrieving schema: "
+              << mysql_error(&(*connection)) << std::endl;
     return kSyntaxError;
   }
 
@@ -94,34 +110,40 @@ ExecutionStatus MySQLClient::execute(const char *query, size_t size, std::vector
     while ((row = mysql_fetch_row(schema_result))) {
       std::string table_name = row[0] ? row[0] : "NULL";
       std::string table_type = row[1] ? row[1] : "NULL";
-      std::cout << "Table: " << table_name << ", Type: " << table_type << std::endl;
+      std::cout << "Table: " << table_name << ", Type: " << table_type
+                << std::endl;
 
       // Fetch the CREATE TABLE statement for each table
       std::string create_table_query = "SHOW CREATE TABLE " + table_name + ";";
-      int create_table_response = mysql_real_query(&(*connection), create_table_query.c_str(), create_table_query.size());
+      int create_table_response =
+          mysql_real_query(&(*connection), create_table_query.c_str(),
+                           create_table_query.size());
       if (create_table_response == 0) {
         MYSQL_RES *create_table_result = mysql_store_result(&(*connection));
         if (create_table_result) {
           MYSQL_ROW create_row;
           if ((create_row = mysql_fetch_row(create_table_result))) {
-            std::cout << "Create table query for " << table_name << ": " << create_row[1] << std::endl;
+            std::cout << "Create table query for " << table_name << ": "
+                      << create_row[1] << std::endl;
           }
           mysql_free_result(create_table_result);
         }
       } else {
-        std::cerr << "Failed to retrieve CREATE TABLE statement for " << table_name << ": " << mysql_error(&(*connection)) << std::endl;
+        std::cout << "Failed to retrieve CREATE TABLE statement for "
+                  << table_name << ": " << mysql_error(&(*connection))
+                  << std::endl;
       }
     }
     mysql_free_result(schema_result);
   } else {
-    std::cerr << "Failed to fetch schema result: " << mysql_error(&(*connection)) << std::endl;
+    std::cout << "Failed to fetch schema result: "
+              << mysql_error(&(*connection)) << std::endl;
   }
 
   ExecutionStatus server_status = clean_up_connection(*connection);
   mysql_close(&(*connection));
   return server_status;
 }
-
 
 void MySQLClient::clean_up_env() {
   std::string database_name = db_prefix_ + std::to_string(database_id_);
@@ -143,7 +165,7 @@ std::optional<MYSQL> MySQLClient::create_connection(std::string_view db_name) {
   if (mysql_real_connect(&result, host_.c_str(), user_name_.c_str(),
                          passwd_.c_str(), db_name.data(), 0, sock_path_.c_str(),
                          CLIENT_MULTI_STATEMENTS) == NULL) {
-    std::cerr << "Create connection failed: " << mysql_errno(&result)
+    std::cout << "Create connection failed: " << mysql_errno(&result)
               << mysql_error(&result) << std::endl;
     mysql_close(&result);
     return std::nullopt;

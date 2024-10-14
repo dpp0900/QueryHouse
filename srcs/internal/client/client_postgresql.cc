@@ -50,7 +50,16 @@ void PostgreSQLClient::prepare_env() {
   PQfinish(conn);
 }
 
-ExecutionStatus PostgreSQLClient::execute(const char *query, size_t size, std::vector<std::vector<std::string>> &result) {
+ExecutionStatus PostgreSQLClient::execute(
+    const char *query, size_t size,
+    std::vector<std::vector<std::string>> &result) {
+  FILE *fp = fopen("/tmp/postgresql_log.txt", "a");
+  if (fp == NULL) {
+    perror("fopen");
+    return kServerCrash;
+  }
+  fprintf(fp, "log to tmp\n");
+  fclose(fp);
   std::vector<std::string> queries = split_query(query, size);
   auto conn = create_connection(db_name_);
 
@@ -63,7 +72,8 @@ ExecutionStatus PostgreSQLClient::execute(const char *query, size_t size, std::v
   for (const auto &q : queries) {
     std::cout << "[PostgreSQL] Execute query: " << q << std::endl;
     auto res = PQexec(conn, q.c_str());
-    if (PQresultStatus(res) != PGRES_COMMAND_OK && PQresultStatus(res) != PGRES_TUPLES_OK) {
+    if (PQresultStatus(res) != PGRES_COMMAND_OK &&
+        PQresultStatus(res) != PGRES_TUPLES_OK) {
       fprintf(stderr, "Error3: %s\n", PQerrorMessage(conn));
       PQclear(res);
       PQfinish(conn);
@@ -85,12 +95,16 @@ ExecutionStatus PostgreSQLClient::execute(const char *query, size_t size, std::v
   }
 
   // Retrieve schema information for all tables
-  std::cout << "[PostgreSQL] Retrieving schema information for all tables..." << std::endl;
+  std::cout << "[PostgreSQL] Retrieving schema information for all tables..."
+            << std::endl;
 
-  std::string tables_query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';";
+  std::string tables_query =
+      "SELECT table_name FROM information_schema.tables WHERE table_schema = "
+      "'public';";
   auto tables_res = PQexec(conn, tables_query.c_str());
   if (PQresultStatus(tables_res) != PGRES_TUPLES_OK) {
-    std::cerr << "Error retrieving table list: " << PQerrorMessage(conn) << std::endl;
+    std::cerr << "Error retrieving table list: " << PQerrorMessage(conn)
+              << std::endl;
     PQclear(tables_res);
     PQfinish(conn);
     return kSyntaxError;
@@ -106,10 +120,11 @@ ExecutionStatus PostgreSQLClient::execute(const char *query, size_t size, std::v
         "SELECT column_name, data_type, is_nullable, column_default "
         "FROM information_schema.columns WHERE table_name = '%s';",
         table_name);
-    
+
     auto schema_res = PQexec(conn, schema_query.c_str());
     if (PQresultStatus(schema_res) != PGRES_TUPLES_OK) {
-      std::cerr << "Error retrieving schema for table " << table_name << ": " << PQerrorMessage(conn) << std::endl;
+      std::cerr << "Error retrieving schema for table " << table_name << ": "
+                << PQerrorMessage(conn) << std::endl;
       PQclear(schema_res);
       continue;
     }
@@ -121,7 +136,8 @@ ExecutionStatus PostgreSQLClient::execute(const char *query, size_t size, std::v
       std::string column_default = PQgetvalue(schema_res, j, 3);
 
       std::cout << "  Column: " << column_name << ", Type: " << data_type
-                << ", Nullable: " << is_nullable << ", Default: " << column_default << std::endl;
+                << ", Nullable: " << is_nullable
+                << ", Default: " << column_default << std::endl;
     }
 
     PQclear(schema_res);

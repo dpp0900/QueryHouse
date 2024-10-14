@@ -69,7 +69,6 @@ std::vector<std::string> SQLiteDB::validate_all(
 bool SQLiteDB::has_mutated_test_cases() {
   return !validated_test_cases_.empty();
 }
-
 size_t SQLiteDB::mutate(Round &r) {
   std::vector<IR *> ir_set, mutated_tree;
   Program *program_root = parser(r.buf_queries);
@@ -96,6 +95,8 @@ size_t SQLiteDB::mutate(Round &r) {
 
   std::vector<std::string> validated_queries = validate_all(mutated_tree);
   outfile << YELLOW << "[Validate mutated IR]" << RESET << std::endl;
+  std::cerr << "validated_queries size: " << validated_queries.size()
+            << std::endl;
   QueryQueue q;
   OraclePlan *plan;
   // 각 타겟에 맞는 쿼리로 변환하여 QueryQueue에 추가
@@ -105,6 +106,7 @@ size_t SQLiteDB::mutate(Round &r) {
             << YELLOW << "[" << i++ << "th test case start!!!!!]" << RESET
             << std::endl;
     q = transpile(validated_query, TARGET_ALL);  // 각 DBMS에 맞게 쿼리 변환
+    std::cerr << "q size: " << q.size() << std::endl;
     outfile << YELLOW << "[Query transpile to suit each DBMS]" << RESET
             << std::endl;
     // std::cout << "  single_query: " << single_query << std::endl;

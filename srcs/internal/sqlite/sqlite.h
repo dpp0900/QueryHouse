@@ -14,7 +14,7 @@ class SQLiteDB : public DataBase {
   // Set up the database.
   SQLiteDB();
   virtual bool initialize(YAML::Node config);
-  virtual size_t mutate(Round &);
+  virtual size_t mutate(Round &r);
   virtual bool save_interesting_query(const std::string &);
   // Return an new query to test. The `buffer` should be unmanaged,
   virtual Round *get_next_mutated_query();

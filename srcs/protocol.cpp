@@ -9,8 +9,7 @@
 
 extern std::ofstream outfile;
 extern std::ofstream errfile;
-std::ofstream logfile("out/bug_report.log",
-                      std::ios_base::app);  // 파일을 추가 모드로 엶
+std::ofstream logfile("/tmp/reportLog", std::ios::out | std::ios::app);
 
 /***************************************
  * Target
@@ -244,12 +243,14 @@ OraclePlan *decode(Round *r) {
   }
   // Initialize OraclePlan with the original query from buf_queries
   std::string src_query = std::string(r->buf_queries);
-  // outfile << "src_query: " << src_query << std::endl;
+  outfile << "src_query: " << src_query << std::endl;
   OraclePlan *plan = new OraclePlan(src_query);
   outfile << YELLOW << "[Create OraclePlan]" << RESET << std::endl;
+  outfile << "num_oracle: " << r->num_oracle << std::endl;
 
   // Set the oracle_plan from Round
   for (int i = 0; i < r->num_oracle; i++) {
+    std::cerr << "oracle_plan: " << r->oracle_plans[i] << std::endl;
     plan->oracle_plan.push_back(r->oracle_plans[i]);
   }
 
@@ -486,10 +487,15 @@ bool execute_plan(
     OraclePlan &plan,
     const std::vector<std::unique_ptr<client::DBClient>> &db_clients,
     client::ExecutionStatus &status) {
+  outfile << YELLOW << "[Executing OraclePlan]" << RESET << std::endl;
+  outfile << YELLOW << "[Plan Size: " << plan.oracle_plan.size() << "]" << RESET
+          << std::endl;
   status = client::kNormal;
   // Iterate through each step in the oracle plan
   for (size_t i = 0; i < plan.oracle_plan.size(); ++i) {
     OracleType oracle_type = plan.oracle_plan[i];
+    outfile << YELLOW << "[Oracle Type: " << static_cast<int>(oracle_type)
+            << "]" << RESET << std::endl;
 
     // Log the start of the round execution
     std::cout << YELLOW << "[Executing Round " << i + 1
@@ -504,23 +510,39 @@ bool execute_plan(
               << std::endl;
 
     // Execute and fetch results for each available DBMS target
+    outfile << YELLOW << "[plan.query_infos.size(): " << plan.query_infos.size()
+            << "]" << RESET << std::endl;
     for (const auto &entry : plan.query_infos) {
       Target target = entry.first;
       const char *query = entry.second.queries[i].c_str();
       size_t query_len = entry.second.queries[i].size();
-      std::cout << YELLOW << "[Executing query on " << target_to_string(target)
-                << "]" << RESET << std::endl;
+      outfile << YELLOW << "[Executing query on " << target_to_string(target)
+              << "]" << RESET << std::endl;
+      outfile << "TargetNum: " << static_cast<int>(target) << std::endl;
+      outfile << "Query: " << query << std::endl;
       client::ExecutionStatus status_buffer =
           db_clients[static_cast<int>(target)]->execute(query, query_len,
                                                         results_buffer);
+      outfile << YELLOW << "[Execution Status: " << status_buffer << "]"
+              << RESET << std::endl;
       if (status == client::kNormal) status = status_buffer;
       results[target] = results_buffer;
+      // print result
+      outfile << RED << "Result for " << target_to_string(target) << RESET
+              << std::endl;
+      for (const auto &row : results[target]) {
+        for (const auto &cell : row) {
+          outfile << cell << " ";
+        }
+        outfile << std::endl;
+      }
+      outfile << std::endl;
     }
 
     // If oracle_type is ORACLE_SKIP, skip the comparison but execute the query
     if (oracle_type == ORACLE_SKIP) {
-      std::cout << YELLOW << "[Skipping comparison for this round]" << RESET
-                << std::endl;
+      outfile << YELLOW << "[Skipping comparison for this round]" << RESET
+              << std::endl;
       compare_skip(i);  // Log skipping, but still execute the query
       continue;
     }
@@ -528,28 +550,28 @@ bool execute_plan(
     // Process according to oracle type
     if (oracle_type == ORACLE_ROWNUM) {
       // Log row count comparison
-      std::cout << YELLOW << "[Comparing row counts]" << RESET << std::endl;
+      outfile << YELLOW << "[Comparing row counts]" << RESET << std::endl;
 
       // Compare row counts only
       if (!compare_row_num(results)) {
-        std::cerr << "Row count mismatch at step " << i + 1 << std::endl;
+        outfile << "Row count mismatch at step " << i + 1 << std::endl;
         report(plan, TARGET_ALL, i);
         return false;  // Mark failure
       }
 
     } else if (oracle_type == ORACLE_ROW) {
       // Log row content comparison
-      std::cout << YELLOW << "[Comparing row contents]" << RESET << std::endl;
+      outfile << YELLOW << "[Comparing row contents]" << RESET << std::endl;
 
       if (!compare_row(results)) {
-        std::cerr << "Row content mismatch at step " << i + 1 << std::endl;
+        outfile << "Row content mismatch at step " << i + 1 << std::endl;
         report(plan, TARGET_ALL, i);
         return false;  // Mark failure
       }
 
     } else if (oracle_type == ORACLE_SCHEMA) {
       // Log schema comparison
-      std::cout << YELLOW << "[Comparing schema]" << RESET << std::endl;
+      outfile << YELLOW << "[Comparing schema]" << RESET << std::endl;
 
       // Schema comparison (not implemented yet)
       if (!compare_schema(i)) {
@@ -565,8 +587,8 @@ bool execute_plan(
     }
 
     // Log the completion of the round
-    std::cout << YELLOW << "[Completed Round " << i + 1 << "]" << RESET
-              << std::endl;
+    outfile << YELLOW << "[Completed Round " << i + 1 << "]" << RESET
+            << std::endl;
   }
 
   return true;

@@ -215,8 +215,14 @@ int main(int argc, char *argv[]) {
   string basedir = getenv("HOME");
   basedir += "/QueryHouse";
   cout << "Basedir: " << basedir << endl;
-  string config_file_path = basedir + "/data/config/";
+  string config_file_path = basedir + "/data/config/config_";
+  vector<string> database = {"sqlite", "mysql", "postgresql", "oracle"};
   vector<string> config_files;
+
+  for (const auto &db : database) {
+    config_files.push_back(config_file_path + db + ".yml");
+    outfile << "Config file: " << config_files.back() << endl;
+  }
 
   // log to tmp
   FILE *fp = fopen("/tmp/db_driver_log", "a");
@@ -227,10 +233,7 @@ int main(int argc, char *argv[]) {
   fprintf(fp, "log to tmp\n");
   fclose(fp);
 
-  for (const auto &entry : filesystem::directory_iterator(config_file_path)) {
-    config_files.push_back(entry.path());
-    cout << "Load config file: " << entry.path() << endl;
-  }
+  // sort config file by name
   vector<unique_ptr<client::DBClient>> db_clients;
   vector<YAML::Node> configs;
   vector<string> db_names;
@@ -242,9 +245,10 @@ int main(int argc, char *argv[]) {
     db_names.push_back(db_name);
     startup_cmds.push_back(startup_cmd);
     configs.push_back(config);
-    cout << "DB Name: " << db_name << endl;
-    cout << "Startup Command: " << startup_cmd << endl;
+    outfile << "DB Name: " << db_name << endl;
+    outfile << "Startup Command: " << startup_cmd << endl;
     db_clients.emplace_back(client::create_client(db_name, config));
+    outfile << "DB Client created." << endl;
   }
 
   outfile << YELLOW << "[Create DB clients]" << RESET << endl;
@@ -273,8 +277,6 @@ int main(int argc, char *argv[]) {
   __afl_start_forkserver();
 
   outfile << YELLOW << "[afl_start_forkserver]" << RESET << endl;
-  len = __afl_next_testcase(buf, kMaxInputSize);
-  __afl_end_testcase(client::kNormal);
   while ((len = __afl_next_testcase(buf, kMaxInputSize)) > 0) {
     outfile << YELLOW << "[__afl_next_testcase]" << RESET << endl;
     outfile << "Received test case: " << buf << endl;
@@ -284,18 +286,18 @@ int main(int argc, char *argv[]) {
     OraclePlan *p = decode(r);
     outfile << YELLOW << "[Decode Round->OraclePlan]" << RESET << endl;
     if (p) {
+      outfile << "Decoded OraclePlan: " << p->to_string() << endl;
       for (auto &db_client : db_clients) {
-        cout << "DB Client: " << db_names[&db_client - &db_clients[0]] << endl;
-        string query((const char *)buf, len);
+        outfile << "DB Client: " << db_names[&db_client - &db_clients[0]]
+                << endl;
         db_client->prepare_env();
-        client::ExecutionStatus status;
-        bool result = execute_plan(*p, db_clients, status);
-        if (status == client::kServerCrash) {
-          while (!db_client->check_alive()) {
-            sleep(5);
-          }
-        }
+        outfile << YELLOW << "[Prepare DB environment]" << RESET << endl;
+      }
+      client::ExecutionStatus status;
+      bool result = execute_plan(*p, db_clients, status);
+      for (auto &db_client : db_clients) {
         db_client->clean_up_env();
+        outfile << YELLOW << "[Clean up DB environment]" << RESET << endl;
       }
     }
 
