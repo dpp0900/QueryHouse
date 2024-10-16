@@ -85,15 +85,7 @@ u8 afl_custom_queue_new_entry(SquirrelMutator *mutator,
 
 unsigned int afl_custom_fuzz_count(SquirrelMutator *mutator,
                                    const unsigned char *buf, size_t buf_size) {
-  FILE *fp = fopen("/tmp/afl_custom_fuzz_log", "a");
-  if (fp == NULL) {
-    perror("fopen");
-    return 1;
-  }
-  fprintf(fp, "log to tmp\n");
   Round *r = (Round *)buf;
-  fprintf(fp, "num_oracle: %d\n", r->num_oracle);
-  fclose(fp);
   return mutator->database->mutate(*r);
 }
 

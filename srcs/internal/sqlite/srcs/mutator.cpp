@@ -219,7 +219,7 @@ void Mutator::init(string f_testcase, string f_common_string, string pragma) {
     string v = s.substr(pos + 2);
     if (find(cmds_.begin(), cmds_.end(), k) == cmds_.end()) {
       cmds_.push_back(k);
-      cout << "Pushing: " << s << std::endl;
+      // cout << "Pushing: " << s << std::endl;
     }
     m_cmd_value_lib_[k].push_back(v);
   }

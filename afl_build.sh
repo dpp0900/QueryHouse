@@ -74,7 +74,7 @@ cd $BASE_DIR/sqlite_afl_bld
 
 CC=$BASE_DIR/afl_bld/afl-clang-fast CXX=$BASE_DIR/afl_bld/afl-clang-fast++ CFLAGS="-DSQLITE_THREADSAFE=0 -DSQLITE_ENABLE_LOAD_EXTENSION=0 -DSQLITE_NO_SYNC -DSQLITE_DEBUG -DSQLITE_ENABLE_FTS4 -DSQLITE_ENABLE_RTREE -DSQLITE_OMIT_RANDOMNESS -fsanitize=address" $BASE_DIR/sqlite/configure --enable-all --disable-shared --disable-static
 CC=$BASE_DIR/afl_bld/afl-clang-fast CXX=$BASE_DIR/afl_bld/afl-clang-fast++ make -j20
-# sudo make install
+sudo make install
 SQLITE_END_TIME=$(date +%s)
 
 # driver 빌드

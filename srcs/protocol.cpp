@@ -250,7 +250,6 @@ OraclePlan *decode(Round *r) {
 
   // Set the oracle_plan from Round
   for (int i = 0; i < r->num_oracle; i++) {
-    std::cerr << "oracle_plan: " << r->oracle_plans[i] << std::endl;
     plan->oracle_plan.push_back(r->oracle_plans[i]);
   }
 
@@ -372,36 +371,47 @@ std::vector<std::vector<std::string>> normalizeValues(
  * prints an explanation if they differ. Returns true if the row counts are the
  * same across all DBMS, false otherwise.
  */
-bool compare_row_num(
-    const std::map<Target, std::vector<std::vector<std::string>>> &results) {
+bool compare_row_num(std::vector<Result> &results) {
   if (results.empty()) {
-    std::cerr << "No results to compare." << std::endl;
+    outfile << "No results to compare." << std::endl;
     return false;
   }
 
   // Get the row count of the first DBMS as the reference
   auto reference_target = results.begin();
-  size_t reference_row_count = reference_target->second.size();
+  size_t reference_row_count = reference_target->result.size();
+  // auto reference_target = results.begin();
+  // size_t reference_row_count = reference_target->second.size();
 
   bool match = true;
 
   // Compare the row count of each DBMS with the reference
-  for (const auto &[target, result] : results) {
-    if (result.size() != reference_row_count) {
-      std::cout << "Row count mismatch detected for target "
-                << static_cast<int>(target) << ":\n";
-      std::cout << "  Target " << static_cast<int>(target) << " has "
-                << result.size() << " rows.\n";
+  for (const auto &result : results) {
+    if (result.result.size() != reference_row_count) {
+      outfile << "Row count mismatch detected for target "
+              << target_to_string(result.target) << ":\n";
+      outfile << "  Target " << target_to_string(result.target) << " has "
+              << result.result.size() << " rows.\n";
       match = false;
     }
   }
 
+  // for (const auto &[target, result] : results) {
+  //   if (result.size() != reference_row_count) {
+  //     outfile << "Row count mismatch detected for target "
+  //             << static_cast<int>(target) << ":\n";
+  //     outfile << "  Target " << static_cast<int>(target) << " has "
+  //             << result.size() << " rows.\n";
+  //     match = false;
+  //   }
+  // }
+
   if (match) {
-    std::cout << "Row count is the same across all DBMS: "
-              << reference_row_count << " rows." << std::endl;
+    outfile << "Row count is the same across all DBMS: " << reference_row_count
+            << " rows." << std::endl;
   } else {
-    std::cout << "Mismatch found in row counts across different DBMS."
-              << std::endl;
+    outfile << "Mismatch found in row counts across different DBMS."
+            << std::endl;
   }
 
   return match;
@@ -502,8 +512,8 @@ bool execute_plan(
               << ": Processing OraclePlan]" << RESET << std::endl;
 
     // Store results for each DBMS dynamically
-    std::map<Target, std::vector<std::vector<std::string>>> results;
     std::vector<std::vector<std::string>> results_buffer;
+    std::vector<Result> results;
 
     // Log the execution of each query for the DBMS
     std::cout << YELLOW << "[Fetching results for each DBMS]" << RESET
@@ -526,17 +536,18 @@ bool execute_plan(
       outfile << YELLOW << "[Execution Status: " << status_buffer << "]"
               << RESET << std::endl;
       if (status == client::kNormal) status = status_buffer;
-      results[target] = results_buffer;
+      results.push_back({target, results_buffer, status_buffer});
       // print result
-      outfile << RED << "Result for " << target_to_string(target) << RESET
-              << std::endl;
-      for (const auto &row : results[target]) {
-        for (const auto &cell : row) {
-          outfile << cell << " ";
+      outfile << RED << "[Result]" << std::endl;
+      outfile << "Target: " << target_to_string(target) << std::endl;
+      outfile << "Status: " << results.back().status << std::endl;
+      for (const auto &row : results.back().result) {
+        for (const auto &col : row) {
+          outfile << col << " ";
         }
         outfile << std::endl;
       }
-      outfile << std::endl;
+      results_buffer.clear();
     }
 
     // If oracle_type is ORACLE_SKIP, skip the comparison but execute the query
@@ -555,34 +566,35 @@ bool execute_plan(
       // Compare row counts only
       if (!compare_row_num(results)) {
         outfile << "Row count mismatch at step " << i + 1 << std::endl;
-        report(plan, TARGET_ALL, i);
+        report(plan, TARGET_ALL, i, results);
         return false;  // Mark failure
       }
 
-    } else if (oracle_type == ORACLE_ROW) {
-      // Log row content comparison
-      outfile << YELLOW << "[Comparing row contents]" << RESET << std::endl;
+      // } else if (oracle_type == ORACLE_ROW) {
+      //   // Log row content comparison
+      //   outfile << YELLOW << "[Comparing row contents]" << RESET <<
+      //   std::endl;
 
-      if (!compare_row(results)) {
-        outfile << "Row content mismatch at step " << i + 1 << std::endl;
-        report(plan, TARGET_ALL, i);
-        return false;  // Mark failure
-      }
+      //   if (!compare_row(results)) {
+      //     outfile << "Row content mismatch at step " << i + 1 << std::endl;
+      //     report(plan, TARGET_ALL, i);
+      //     return false;  // Mark failure
+      //   }
 
-    } else if (oracle_type == ORACLE_SCHEMA) {
-      // Log schema comparison
-      outfile << YELLOW << "[Comparing schema]" << RESET << std::endl;
+      // } else if (oracle_type == ORACLE_SCHEMA) {
+      //   // Log schema comparison
+      //   outfile << YELLOW << "[Comparing schema]" << RESET << std::endl;
 
-      // Schema comparison (not implemented yet)
-      if (!compare_schema(i)) {
-        std::cerr << "Schema mismatch at step " << i + 1 << std::endl;
-        report(plan, TARGET_ALL, i);
-        return false;  // Mark failure
-      }
+      //   // Schema comparison (not implemented yet)
+      //   if (!compare_schema(i)) {
+      //     std::cerr << "Schema mismatch at step " << i + 1 << std::endl;
+      //     report(plan, TARGET_ALL, i);
+      //     return false;  // Mark failure
+      //   }
 
     } else {
       std::cerr << "Unknown OracleType at step " << i + 1 << std::endl;
-      report(plan, TARGET_ALL, i);
+      report(plan, TARGET_ALL, i, results);
       return false;  // Mark failure
     }
 
@@ -614,7 +626,7 @@ bool execute_plan(
 // 모든 쿼리와 position 위치의 쿼리 및 oracle_plan을 출력하는 함수
 void log_queries_for_target(std::ofstream &logfile, const OraclePlan &plan,
                             Target target, const std::string &target_name,
-                            uint8_t position) {
+                            uint8_t position, std::vector<Result> &results) {
   // 모든 쿼리 출력
   logfile << " " << target_name << ": ";
   for (const auto &query : plan.query_infos.at(target).queries) {
@@ -630,6 +642,17 @@ void log_queries_for_target(std::ofstream &logfile, const OraclePlan &plan,
     logfile << "No query at position " << static_cast<int>(position) << "\n";
   }
 
+  logfile << "Result for this piece: \n";
+  for (const auto &result : results) {
+    if (result.target == target) {
+      for (const auto &row : result.result) {
+        for (const auto &col : row) {
+          logfile << col << " ";
+        }
+        logfile << "\n";
+      }
+    }
+  }
   // position에 해당하는 oracle_plan 출력
   if (position <
       plan.oracle_plan.size()) {  // oracle_plan 개수보다 position이 큰지 검사
@@ -642,7 +665,8 @@ void log_queries_for_target(std::ofstream &logfile, const OraclePlan &plan,
   logfile << "\n";
 }
 
-void report(OraclePlan &plan, TargetsMask buggy_targets, uint8_t position) {
+void report(OraclePlan &plan, TargetsMask buggy_targets, uint8_t position,
+            std::vector<Result> &results) {
   // 로그 파일 열기
 
   if (!logfile.is_open()) {
@@ -654,23 +678,26 @@ void report(OraclePlan &plan, TargetsMask buggy_targets, uint8_t position) {
 
   // MySQL 체크
   if (buggy_targets & 0x1) {
-    log_queries_for_target(logfile, plan, Target::MySQL, "MySQL", position);
+    log_queries_for_target(logfile, plan, Target::MySQL, "MySQL", position,
+                           results);
   }
 
   // PostgreSQL 체크
   if (buggy_targets & 0x2) {
     log_queries_for_target(logfile, plan, Target::PostgreSQL, "PostgreSQL",
-                           position);
+                           position, results);
   }
 
   // SQLite 체크
   if (buggy_targets & 0x4) {
-    log_queries_for_target(logfile, plan, Target::SQLite, "SQLite", position);
+    log_queries_for_target(logfile, plan, Target::SQLite, "SQLite", position,
+                           results);
   }
 
   // Oracle 체크
   if (buggy_targets & 0x8) {
-    log_queries_for_target(logfile, plan, Target::Oracle, "Oracle", position);
+    log_queries_for_target(logfile, plan, Target::Oracle, "Oracle", position,
+                           results);
   }
 
   logfile << "    Position in query: " << static_cast<int>(position) << "\n\n";

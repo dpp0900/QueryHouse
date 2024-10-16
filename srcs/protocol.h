@@ -296,14 +296,21 @@ bool execute_plan(
     OraclePlan &plan,
     const std::vector<std::unique_ptr<client::DBClient>> &db_clients,
     client::ExecutionStatus &status);
+
+// result struct
+typedef struct Result {
+  Target target;
+  std::vector<std::vector<std::string>> result;
+  client::ExecutionStatus status;
+} Result;
+
 /*
  * compare_row_num()
  *
  * Compares the number of rows between two query results and prints an
  * explanation if they differ.
  */
-bool compare_row_num(const std::vector<std::vector<std::string>> &result1,
-                     const std::vector<std::vector<std::string>> &result2);
+bool compare_row_num(const std::vector<Result> &results);
 
 /*
  * compare_row()
@@ -327,11 +334,11 @@ bool compare_schema(size_t step);
  *  - Log on file
  *  - Prints OraclePlan, which DBMS is buggy on which piece of queries
  */
-void report(OraclePlan &plan, TargetsMask buggy_targets,
-            uint8_t position);  // TODO
+void report(OraclePlan &plan, TargetsMask buggy_targets, uint8_t position,
+            std::vector<Result> &results);  // TODO
 void log_queries_for_target(std::ofstream &outfile, const OraclePlan &plan,
                             Target target, const std::string &target_name,
-                            uint8_t position);
+                            uint8_t position, std::vector<Result> &results);
 // void print_buf_queries(const char* buf, size_t length);
 
 #endif  // __PROTOCOL_H__
