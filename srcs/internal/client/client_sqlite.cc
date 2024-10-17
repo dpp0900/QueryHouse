@@ -82,14 +82,8 @@ ExecutionStatus SQLiteClient::execute(
     sqlite3_finalize(stmt);  // 쿼리 완료 후 메모리 해제
   }
   if (result.empty()) {
-    std::cout << "[SQLite] No result" << std::endl;
+    sqllogfile << "[SQLite] No result" << std::endl;
   } else {
-    sqllogfile
-        << "[SQLite] Target Query:  CREATE TABLE v0 (v1 INTEGER); INSERT "
-           "INTO v0 VALUES (1), (10), (10); CREATE UNIQUE INDEX v2 "
-           "ON v0 (v1) WHERE v1 = 1; SELECT DISTINCT v1 FROM "
-           "v0 WHERE v1 = 10;"
-        << std::endl;
     sqllogfile << "[SQLite] Execute Query: ";
     sqllogfile << query << std::endl;
     sqllogfile << "[SQLite] Result: " << std::endl;

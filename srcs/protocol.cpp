@@ -387,6 +387,12 @@ bool compare_row_num(std::vector<Result> &results) {
 
   // Compare the row count of each DBMS with the reference
   for (const auto &result : results) {
+    // check status of each result
+    if (result.status != client::kNormal) {
+      outfile << "Error: " << target_to_string(result.target)
+              << " returned with status: " << result.status << std::endl;
+      return true;  // Skip comparison
+    }
     if (result.result.size() != reference_row_count) {
       outfile << "Row count mismatch detected for target "
               << target_to_string(result.target) << ":\n";
@@ -566,7 +572,11 @@ bool execute_plan(
       // Compare row counts only
       if (!compare_row_num(results)) {
         outfile << "Row count mismatch at step " << i + 1 << std::endl;
-        report(plan, TARGET_ALL, i, results);
+        // report to only two target
+        report(plan, TARGET(Target::SQLite) | TARGET(Target::PostgreSQL), i,
+               results);
+        // report(plan, TARGET(Target::SQLite) | TARGET(Target::PostgreSQL), i,
+        //        results);
         return false;  // Mark failure
       }
 
@@ -594,7 +604,8 @@ bool execute_plan(
 
     } else {
       std::cerr << "Unknown OracleType at step " << i + 1 << std::endl;
-      report(plan, TARGET_ALL, i, results);
+      report(plan, TARGET(Target::SQLite) | TARGET(Target::PostgreSQL), i,
+             results);
       return false;  // Mark failure
     }
 
@@ -628,6 +639,7 @@ void log_queries_for_target(std::ofstream &logfile, const OraclePlan &plan,
                             Target target, const std::string &target_name,
                             uint8_t position, std::vector<Result> &results) {
   // 모든 쿼리 출력
+  outfile << "[tmp] log_queries_for_target : " << target_name << std::endl;
   logfile << " " << target_name << ": ";
   for (const auto &query : plan.query_infos.at(target).queries) {
     logfile << query << " ";
@@ -667,41 +679,42 @@ void log_queries_for_target(std::ofstream &logfile, const OraclePlan &plan,
 
 void report(OraclePlan &plan, TargetsMask buggy_targets, uint8_t position,
             std::vector<Result> &results) {
+  outfile << YELLOW << "[Reporting Bug]" << RESET << std::endl;
   // 로그 파일 열기
 
   if (!logfile.is_open()) {
-    std::cerr << "Error opening log file!" << std::endl;
+    outfile << RED << "Error: Could not open the log file." << RESET
+            << std::endl;
     return;
   }
 
   logfile << "Bug Report:\n";
 
   // MySQL 체크
-  if (buggy_targets & 0x1) {
+  if (TARGET(Target::MySQL) & buggy_targets) {
     log_queries_for_target(logfile, plan, Target::MySQL, "MySQL", position,
                            results);
   }
 
   // PostgreSQL 체크
-  if (buggy_targets & 0x2) {
+  if (TARGET(Target::PostgreSQL) & buggy_targets) {
     log_queries_for_target(logfile, plan, Target::PostgreSQL, "PostgreSQL",
                            position, results);
   }
 
   // SQLite 체크
-  if (buggy_targets & 0x4) {
+  if (TARGET(Target::SQLite) & buggy_targets) {
     log_queries_for_target(logfile, plan, Target::SQLite, "SQLite", position,
                            results);
   }
 
   // Oracle 체크
-  if (buggy_targets & 0x8) {
+  if (TARGET(Target::Oracle) & buggy_targets) {
     log_queries_for_target(logfile, plan, Target::Oracle, "Oracle", position,
                            results);
   }
 
   logfile << "    Position in query: " << static_cast<int>(position) << "\n\n";
-  logfile.close();
 }
 void postprocess(OraclePlan *plan, OraclePlan *old_plan) {
   // Perform operations on the plan, perhaps modifying it based on old_plan or
