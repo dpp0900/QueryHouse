@@ -317,8 +317,7 @@ bool compare_row_num(const std::vector<Result> &results);
  * Compares the content of each row between two query results and prints an
  * explanation if they differ.
  */
-bool compare_row(const std::vector<std::vector<std::string>> &result1,
-                 const std::vector<std::vector<std::string>> &result2);
+bool compare_row(const std::vector<Result> &results);
 
 // Function to skip comparison
 bool compare_skip(size_t step);
@@ -333,7 +332,7 @@ bool compare_schema(size_t step);
  *  - Log on file
  *  - Prints OraclePlan, which DBMS is buggy on which piece of queries
  */
-void report(OraclePlan &plan, TargetsMask buggy_targets, uint8_t position,
+void report(OraclePlan &plan, uint8_t position,
             std::vector<Result> &results);  // TODO
 void log_queries_for_target(std::ofstream &outfile, const OraclePlan &plan,
                             Target target, const std::string &target_name,

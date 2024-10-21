@@ -9,7 +9,7 @@
 #include "transpile.h"
 #include "utils.h"
 
-std::ofstream mutateOutfile("/tmp/mutator.log");
+std::ofstream mutateOutfile("/tmp/mutator.Fuzzlog");
 SQLiteDB *create_sqlite() { return new SQLiteDB; }
 SQLiteDB::SQLiteDB() { mutator_ = std::make_unique<Mutator>(); }
 
