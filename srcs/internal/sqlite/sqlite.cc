@@ -103,9 +103,7 @@ size_t SQLiteDB::mutate(Round &r) {
     mutateOutfile << "\n\n"
                   << YELLOW << "[" << i++ << "th test case start!!!!!]" << RESET
                   << std::endl;
-    q = transpile(validated_query,
-                  TARGET(Target::SQLite) |
-                      TARGET(Target::PostgreSQL));  // 각 DBMS에 맞게 쿼리 변환
+    q = transpile(validated_query, TARGET_ALL);  // 각 DBMS에 맞게 쿼리 변환
     // std::cerr << "q size: " << q.size() << std::endl;
     mutateOutfile << YELLOW << "[Query transpile to suit each DBMS]" << RESET
                   << std::endl;
@@ -134,10 +132,9 @@ size_t SQLiteDB::mutate(Round &r) {
 
     if (plan && plan->is_valid()) {
       validated_test_cases_.push(encode(plan));  // Plan이 유효한 경우에만
-      //   push mutateOutfile << GREEN
-      //                 << "[ Original query before mutation:  " <<
-      //                 r.buf_queries
-      //                 << "]" << RESET << std::endl;
+      mutateOutfile << GREEN
+                    << "[ Original query before mutation:  " << r.buf_queries
+                    << "]" << RESET << std::endl;
       mutateOutfile << GREEN << "[ mutated query:                   "
                     << validated_test_cases_.top()->buf_queries << "]" << RESET
                     << std::endl;

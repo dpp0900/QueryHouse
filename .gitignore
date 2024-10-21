@@ -7,3 +7,4 @@ opt
 build*
 *bld
 .prettierrc
+sqlite_unpatch

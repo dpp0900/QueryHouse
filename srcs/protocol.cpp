@@ -502,11 +502,10 @@ bool compare_schema(size_t step) {
 bool execute_plan(
     OraclePlan &plan,
     const std::vector<std::unique_ptr<client::DBClient>> &db_clients,
-    client::ExecutionStatus &status) {
+    std::vector<Result> &results) {
   outfile << YELLOW << "[Executing OraclePlan]" << RESET << std::endl;
   outfile << YELLOW << "[Plan Size: " << plan.oracle_plan.size() << "]" << RESET
           << std::endl;
-  status = client::kNormal;
   // Iterate through each step in the oracle plan
   for (size_t i = 0; i < plan.oracle_plan.size(); ++i) {
     OracleType oracle_type = plan.oracle_plan[i];
@@ -519,7 +518,6 @@ bool execute_plan(
 
     // Store results for each DBMS dynamically
     std::vector<std::vector<std::string>> results_buffer;
-    std::vector<Result> results;
 
     // Log the execution of each query for the DBMS
     std::cout << YELLOW << "[Fetching results for each DBMS]" << RESET
@@ -541,7 +539,6 @@ bool execute_plan(
                                                         results_buffer);
       outfile << YELLOW << "[Execution Status: " << status_buffer << "]"
               << RESET << std::endl;
-      if (status == client::kNormal) status = status_buffer;
       results.push_back({target, results_buffer, status_buffer});
       // print result
       outfile << RED << "[Result]" << std::endl;
@@ -573,8 +570,7 @@ bool execute_plan(
       if (!compare_row_num(results)) {
         outfile << "Row count mismatch at step " << i + 1 << std::endl;
         // report to only two target
-        report(plan, TARGET(Target::SQLite) | TARGET(Target::PostgreSQL), i,
-               results);
+        report(plan, TARGET_ALL, i, results);
         // report(plan, TARGET(Target::SQLite) | TARGET(Target::PostgreSQL), i,
         //        results);
         return false;  // Mark failure
@@ -604,8 +600,7 @@ bool execute_plan(
 
     } else {
       std::cerr << "Unknown OracleType at step " << i + 1 << std::endl;
-      report(plan, TARGET(Target::SQLite) | TARGET(Target::PostgreSQL), i,
-             results);
+      report(plan, TARGET_ALL, i, results);
       return false;  // Mark failure
     }
 
