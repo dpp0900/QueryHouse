@@ -31,8 +31,8 @@
 using namespace std;
 namespace py = pybind11;
 
-ofstream outfile("/tmp/output.txt");
-ofstream errfile("/tmp/error_log.txt");
+ofstream outfile("/tmp/output.Fuzzlog");
+ofstream errfile("/tmp/error_log.Fuzzlog");
 
 void print_buf_queries(const char *buf, size_t length = 0x100) {
   cout << "buf_queries (first " << length << " bytes):" << endl;
@@ -223,15 +223,6 @@ int main(int argc, char *argv[]) {
     config_files.push_back(config_file_path + db + ".yml");
     outfile << "Config file: " << config_files.back() << endl;
   }
-
-  // log to tmp
-  FILE *fp = fopen("/tmp/db_driver_log", "a");
-  if (fp == NULL) {
-    perror("fopen");
-    return 1;
-  }
-  fprintf(fp, "log to tmp\n");
-  fclose(fp);
 
   // sort config file by name
   vector<unique_ptr<client::DBClient>> db_clients;

@@ -11,7 +11,8 @@
 #include <string_view>
 #include <vector>
 
-std::fstream mysql_logfile("/tmp/mysql.log", std::ios::out | std::ios::app);
+std::fstream mysql_logfile("/tmp/mysql_log.Fuzzlog",
+                           std::ios::out | std::ios::app);
 
 #include "mysql.h"
 #include "mysqld_error.h"

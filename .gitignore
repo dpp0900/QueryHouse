@@ -8,3 +8,4 @@ build*
 *bld
 .prettierrc
 sqlite_unpatch
+sqlite_patch

@@ -9,7 +9,7 @@
 
 using namespace std;
 
-std::fstream oracle_logfile("/tmp/oracle_log.txt",
+std::fstream oracle_logfile("/tmp/oracle_log.Fuzzlog",
                             std::ios::out | std::ios::app);
 namespace client {
 
@@ -34,13 +34,8 @@ void OracleClient::prepare_env() {
     default_schema_ = "C##" + schema_name;
   }
 
-  FILE *fp = fopen("/tmp/oracle_log.txt", "a");
-  if (fp == NULL) {
-    perror("fopen");
-  } else {
-    fprintf(fp, "Prepared environment with schema: %s\n", schema_name.c_str());
-    fclose(fp);
-  }
+  oracle_logfile << "Prepared environment with schema: " << schema_name
+                 << std::endl;
 }
 
 ExecutionStatus OracleClient::execute(

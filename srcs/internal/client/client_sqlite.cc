@@ -5,7 +5,8 @@
 #include <string>
 #include <vector>
 
-std::fstream sqlite_logfile("/tmp/sqlite3.log", std::ios::out | std::ios::app);
+std::fstream sqlite_logfile("/tmp/sqlite3_log.Fuzzlog",
+                            std::ios::out | std::ios::app);
 
 namespace client {
 

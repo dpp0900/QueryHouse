@@ -9,8 +9,7 @@
 
 extern std::ofstream outfile;
 extern std::ofstream errfile;
-std::ofstream logfile("/tmp/reportLog", std::ios::out | std::ios::app);
-
+std::ofstream logfile("/tmp/report.Fuzzlog", std::ios::out | std::ios::app);
 /***************************************
  * Target
  ***************************************/
@@ -371,46 +370,46 @@ std::vector<std::vector<std::string>> normalizeValues(
  * prints an explanation if they differ. Returns true if the row counts are the
  * same across all DBMS, false otherwise.
  */
+
 bool compare_row_num(std::vector<Result> &results) {
   if (results.empty()) {
     outfile << "No results to compare." << std::endl;
-    return false;
+    return true;
+  }
+
+  // Filter results with status == client::kNormal
+  std::vector<Result> normal_results;
+  for (const auto &result : results) {
+    if (result.status == client::kNormal) {
+      normal_results.push_back(result);
+    } else {
+      outfile << "Error: " << target_to_string(result.target)
+              << " returned with status: " << result.status << std::endl;
+    }
+  }
+
+  if (normal_results.empty()) {
+    outfile << "No results with status kNormal to compare." << std::endl;
+    return true;
   }
 
   // Get the row count of the first DBMS as the reference
-  auto reference_target = results.begin();
+  auto reference_target = normal_results.begin();
   size_t reference_row_count = reference_target->result.size();
-  // auto reference_target = results.begin();
-  // size_t reference_row_count = reference_target->second.size();
 
   bool match = true;
 
   // Compare the row count of each DBMS with the reference
-  for (const auto &result : results) {
-    // check status of each result
-    if (result.status != client::kNormal) {
-      outfile << "Error: " << target_to_string(result.target)
-              << " returned with status: " << result.status << std::endl;
-      return true;  // Skip comparison
-    }
+  for (const auto &result : normal_results) {
     if (result.result.size() != reference_row_count) {
       outfile << "Row count mismatch detected for target "
               << target_to_string(result.target) << ":\n";
       outfile << "  Target " << target_to_string(result.target) << " has "
               << result.result.size() << " rows.\n";
       match = false;
+      results = normal_results;
     }
   }
-
-  // for (const auto &[target, result] : results) {
-  //   if (result.size() != reference_row_count) {
-  //     outfile << "Row count mismatch detected for target "
-  //             << static_cast<int>(target) << ":\n";
-  //     outfile << "  Target " << static_cast<int>(target) << " has "
-  //             << result.size() << " rows.\n";
-  //     match = false;
-  //   }
-  // }
 
   if (match) {
     outfile << "Row count is the same across all DBMS: " << reference_row_count
@@ -431,52 +430,82 @@ bool compare_row_num(std::vector<Result> &results) {
  * false. Returns true if the rows are the same across all DBMS, false
  * otherwise.
  */
-bool compare_row(
-    const std::map<Target, std::vector<std::vector<std::string>>> &results) {
+bool compare_row(std::vector<Result> &results) {
   if (results.empty()) {
-    std::cerr << "Error: No results to compare." << std::endl;
-    return false;
+    outfile << "No results to compare." << std::endl;
+    return true;
+  }
+
+  // Filter results with status == client::kNormal
+  std::vector<Result> normal_results;
+  for (const auto &result : results) {
+    if (result.status == client::kNormal) {
+      normal_results.push_back(result);
+    } else {
+      outfile << "Error: " << target_to_string(result.target)
+              << " returned with status: " << result.status << std::endl;
+    }
+  }
+
+  if (normal_results.size() < 2) {
+    outfile << "No results with status kNormal to compare." << std::endl;
+    return true;
   }
 
   // Prepare to store normalized and sorted results for all DBMS
   std::map<Target, std::vector<std::vector<std::string>>> sorted_results;
 
   // Normalize and sort all DBMS results
-  for (const auto &[target, result] : results) {
-    sorted_results[target] = normalizeValues(result);
-    std::sort(sorted_results[target].begin(), sorted_results[target].end());
+  for (const auto &result : normal_results) {
+    sorted_results[result.target] = normalizeValues(result.result);
+    std::sort(sorted_results[result.target].begin(),
+              sorted_results[result.target].end());
   }
 
   // Use the first DBMS's sorted result as the baseline for comparison
   auto reference_target = sorted_results.begin();
   const auto &sorted_reference = reference_target->second;
 
+  bool match = true;
+
   // Compare all other DBMS results to the reference
-  for (const auto &[target, sorted_result] : sorted_results) {
-    if (target == reference_target->first)
+  for (const auto &result : normal_results) {
+    const auto &sorted_result = sorted_results[result.target];
+    if (result.target == reference_target->first)
       continue;  // Skip comparison with the reference
 
     if (sorted_reference != sorted_result) {
-      std::cout << "Row 0 mismatch detected across DBMS:" << std::endl;
+      outfile << "Row mismatch detected for target "
+              << target_to_string(result.target) << ":" << std::endl;
 
       // Print the mismatched row from each DBMS
-      for (const auto &[dbms_target, dbms_result] : results) {
-        std::string target_name = target_to_string(dbms_target);
-        std::cout << "  " << target_name << ": [ ";
-        for (const auto &val : dbms_result[0]) {
-          std::cout << val << " ";
+      for (const auto &dbms_result : normal_results) {
+        std::string target_name = target_to_string(dbms_result.target);
+        outfile << "  " << target_name << ": [ ";
+        for (const auto &row : dbms_result.result) {
+          outfile << "[ ";
+          for (const auto &col : row) {
+            outfile << col << " ";
+          }
+          outfile << "] ";
         }
-        std::cout << "]" << std::endl;
+        outfile << "]" << std::endl;
       }
 
-      return false;
+      match = false;
+      results = normal_results;
     }
   }
 
-  std::cout
-      << "Rows are identical across all DBMS after normalization and sorting."
-      << std::endl;
-  return true;
+  if (match) {
+    outfile
+        << "Rows are identical across all DBMS after normalization and sorting."
+        << std::endl;
+  } else {
+    outfile << "Mismatch found in rows across different DBMS." << std::endl;
+  }
+
+  return match;
 }
 
 // Function to skip comparison
@@ -509,6 +538,7 @@ bool execute_plan(
   // Iterate through each step in the oracle plan
   for (size_t i = 0; i < plan.oracle_plan.size(); ++i) {
     OracleType oracle_type = plan.oracle_plan[i];
+    oracle_type = ORACLE_ROW;  // for testing
     outfile << YELLOW << "[Oracle Type: " << static_cast<int>(oracle_type)
             << "]" << RESET << std::endl;
 
@@ -570,22 +600,21 @@ bool execute_plan(
       if (!compare_row_num(results)) {
         outfile << "Row count mismatch at step " << i + 1 << std::endl;
         // report to only two target
-        report(plan, TARGET_ALL, i, results);
+        report(plan, i, results);
         // report(plan, TARGET(Target::SQLite) | TARGET(Target::PostgreSQL), i,
         //        results);
         return false;  // Mark failure
       }
 
-      // } else if (oracle_type == ORACLE_ROW) {
-      //   // Log row content comparison
-      //   outfile << YELLOW << "[Comparing row contents]" << RESET <<
-      //   std::endl;
+    } else if (oracle_type == ORACLE_ROW) {
+      // Log row content comparison
+      outfile << YELLOW << "[Comparing row contents]" << RESET << std::endl;
 
-      //   if (!compare_row(results)) {
-      //     outfile << "Row content mismatch at step " << i + 1 << std::endl;
-      //     report(plan, TARGET_ALL, i);
-      //     return false;  // Mark failure
-      //   }
+      if (!compare_row(results)) {
+        outfile << "Row content mismatch at step " << i + 1 << std::endl;
+        report(plan, i, results);
+        return false;  // Mark failure
+      }
 
       // } else if (oracle_type == ORACLE_SCHEMA) {
       //   // Log schema comparison
@@ -600,7 +629,7 @@ bool execute_plan(
 
     } else {
       std::cerr << "Unknown OracleType at step " << i + 1 << std::endl;
-      report(plan, TARGET_ALL, i, results);
+      report(plan, i, results);
       return false;  // Mark failure
     }
 
@@ -635,6 +664,12 @@ void log_queries_for_target(std::ofstream &logfile, const OraclePlan &plan,
                             uint8_t position, std::vector<Result> &results) {
   // 모든 쿼리 출력
   outfile << "[tmp] log_queries_for_target : " << target_name << std::endl;
+  // check loggile open
+  if (!logfile.is_open()) {
+    outfile << RED << "Error: Could not open the log file." << RESET
+            << std::endl;
+    return;
+  }
   logfile << " " << target_name << ": ";
   for (const auto &query : plan.query_infos.at(target).queries) {
     logfile << query << " ";
@@ -672,8 +707,7 @@ void log_queries_for_target(std::ofstream &logfile, const OraclePlan &plan,
   logfile << "\n";
 }
 
-void report(OraclePlan &plan, TargetsMask buggy_targets, uint8_t position,
-            std::vector<Result> &results) {
+void report(OraclePlan &plan, uint8_t position, std::vector<Result> &results) {
   outfile << YELLOW << "[Reporting Bug]" << RESET << std::endl;
   // 로그 파일 열기
 
@@ -683,8 +717,12 @@ void report(OraclePlan &plan, TargetsMask buggy_targets, uint8_t position,
     return;
   }
 
+  logfile << std::unitbuf;
   logfile << "Bug Report:\n";
-
+  TargetsMask buggy_targets;
+  for (const auto &result : results) {
+    buggy_targets |= TARGET(static_cast<uint8_t>(result.target));
+  }
   // MySQL 체크
   if (TARGET(Target::MySQL) & buggy_targets) {
     log_queries_for_target(logfile, plan, Target::MySQL, "MySQL", position,

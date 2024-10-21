@@ -44,7 +44,7 @@ fi
 
 cd $BASE_DIR/postgres_bld
 $BASE_DIR/postgres/configure --prefix=/usr/local/pgsql
-sudo make -j4
+sudo make -j20
 sudo make install
 rm -rf /usr/local/pgsql/data/*
 sudo mkdir /usr/local/pgsql/data
@@ -60,14 +60,14 @@ fi
 
 cd $BASE_DIR/sqlite_bld
 $BASE_DIR/sqlite/configure --enable-all
-make -j4
+make -j20
 sudo make install
 SQLITE_END_TIME=$(date +%s)
 
 # CMake 빌드
 cd $BASE_DIR
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -Wno-dev -DORACLE=ON
-cmake --build build -j4
+cmake --build build -j20
 
 DRIVER_END_TIME=$(date +%s)
 
