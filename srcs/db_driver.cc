@@ -293,11 +293,37 @@ int main(int argc, char *argv[]) {
         db_client->prepare_env();
         outfile << YELLOW << "[Prepare DB environment]" << RESET << endl;
       }
-      client::ExecutionStatus status;
-      bool result = execute_plan(*p, db_clients, status);
+      vector<Result> results;
+      execute_plan(*p, db_clients, results);
+      // for (auto &result : results) {
+      //   if (result.status == client::kConnectFailed) {
+      //     outfile << RED << "[Server crashed for DB: "
+      //             << target_to_string(result.target) << "]" << RESET << endl;
+
+      //     string startup_cmd = startup_cmds[(int)result.target];
+      //     outfile << MAGENTA << "[Start server: " << startup_cmd << "]" <<
+      //     RESET
+      //             << endl;
+      //     system(startup_cmd.c_str());
+      //     sleep(5);
+      //   }
+      // }
       for (auto &db_client : db_clients) {
+        if (results[&db_client - &db_clients[0]].status ==
+            client::kConnectFailed) {
+          outfile << RED << "[Server crashed for DB: "
+                  << db_names[&db_client - &db_clients[0]] << "]" << RESET
+                  << endl;
+          string startup_cmd = startup_cmds[&db_client - &db_clients[0]];
+          outfile << MAGENTA << "[Start server: " << startup_cmd << "]" << RESET
+                  << endl;
+          system(startup_cmd.c_str());
+          sleep(5);
+        }
         db_client->clean_up_env();
         outfile << YELLOW << "[Clean up DB environment]" << RESET << endl;
+        outfile << YELLOW << db_names[&db_client - &db_clients[0]]
+                << " DB environment cleaned up." << RESET << endl;
       }
     }
 

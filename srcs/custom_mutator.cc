@@ -67,13 +67,6 @@ u8 afl_custom_queue_new_entry(SquirrelMutator *mutator,
 
   // Extract the buffer queries from the Round structure
   std::string buf_queries = r->buf_queries;
-  FILE *fp = fopen("/tmp/afl_custom_queue_new_entry_log", "a");
-  if (fp == NULL) {
-    perror("fopen");
-    return 1;
-  }
-  fprintf(fp, "%s\n", buf_queries.c_str());
-  fclose(fp);
   // Pass the queries to the mutator's database for saving
   mutator->database->save_interesting_query(buf_queries);
 
@@ -95,13 +88,6 @@ size_t afl_custom_fuzz(SquirrelMutator *mutator, uint8_t *buf, size_t buf_size,
                        size_t max_size) {
   DataBase *db = mutator->database;
   assert(db->has_mutated_test_cases());
-  FILE *fp = fopen("/tmp/afl_custom_fuzz_log", "a");
-  if (fp == NULL) {
-    perror("fopen");
-    return 1;
-  }
-  fprintf(fp, "log afl_custom_fuzz\n");
-  fclose(fp);
   mutator->current_input = db->get_next_mutated_query();
   *out_buf = (u8 *)mutator->current_input;
   return MAX_ROUND_SIZE;

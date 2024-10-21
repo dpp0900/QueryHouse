@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-std::fstream sqllogfile("/tmp/sqlite3.log", std::ios::out | std::ios::app);
+std::fstream sqlite_logfile("/tmp/sqlite3.log", std::ios::out | std::ios::app);
 
 namespace client {
 
@@ -26,10 +26,10 @@ ExecutionStatus SQLiteClient::execute(
     const char *query, size_t size,
     std::vector<std::vector<std::string>> &result) {
   std::cout << "[SQLite] Executing queries..." << std::endl;
-  // sqllogfile << "[SQLite] Executing queries..." << std::endl;
-  // sqllogfile << query << std::endl;
+  // sqlite_logfile << "[SQLite] Executing queries..." << std::endl;
+  // sqlite_logfile << query << std::endl;
 
-  // sqllogfile << "[SQLite] Result before execute: " << std::endl;
+  // sqlite_logfile << "[SQLite] Result before execute: " << std::endl;
   std::vector<std::string> queries = split_query(query, size);
   sqlite3 *db = nullptr;
 
@@ -82,22 +82,16 @@ ExecutionStatus SQLiteClient::execute(
     sqlite3_finalize(stmt);  // 쿼리 완료 후 메모리 해제
   }
   if (result.empty()) {
-    std::cout << "[SQLite] No result" << std::endl;
+    sqlite_logfile << "[SQLite] No result" << std::endl;
   } else {
-    sqllogfile
-        << "[SQLite] Target Query:  CREATE TABLE v0 (v1 INTEGER); INSERT "
-           "INTO v0 VALUES (1), (10), (10); CREATE UNIQUE INDEX v2 "
-           "ON v0 (v1) WHERE v1 = 1; SELECT DISTINCT v1 FROM "
-           "v0 WHERE v1 = 10;"
-        << std::endl;
-    sqllogfile << "[SQLite] Execute Query: ";
-    sqllogfile << query << std::endl;
-    sqllogfile << "[SQLite] Result: " << std::endl;
+    sqlite_logfile << "[SQLite] Execute Query: ";
+    sqlite_logfile << query << std::endl;
+    sqlite_logfile << "[SQLite] Result: " << std::endl;
     for (const auto &row : result) {
       for (const auto &col : row) {
-        sqllogfile << col << " ";
+        sqlite_logfile << col << " ";
       }
-      sqllogfile << std::endl;
+      sqlite_logfile << std::endl;
     }
   }
   // 스키마 정보 가져오기

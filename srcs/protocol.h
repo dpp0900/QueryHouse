@@ -291,18 +291,17 @@ std::string formatFloat(const std::string &floatStr);
 // floats
 std::vector<std::vector<std::string>> normalizeValues(
     const std::vector<std::vector<std::string>> &result);
-
-bool execute_plan(
-    OraclePlan &plan,
-    const std::vector<std::unique_ptr<client::DBClient>> &db_clients,
-    client::ExecutionStatus &status);
-
 // result struct
 typedef struct Result {
   Target target;
   std::vector<std::vector<std::string>> result;
   client::ExecutionStatus status;
 } Result;
+
+bool execute_plan(
+    OraclePlan &plan,
+    const std::vector<std::unique_ptr<client::DBClient>> &db_clients,
+    std::vector<Result> &results);
 
 /*
  * compare_row_num()
