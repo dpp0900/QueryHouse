@@ -350,9 +350,26 @@ std::string formatFloat(const std::string &floatStr) {
 // floats
 std::vector<std::vector<std::string>> normalizeValues(
     const std::vector<std::vector<std::string>> &result) {
+  // string replace map
+  std::map<std::string, std::string> replace_map = {
+      {"t", "1"},
+      {"f", "0"},
+  };
+
   auto normalized_result = result;
   for (auto &row : normalized_result) {
     for (auto &cell : row) {
+      // Replace
+      for (const auto &pair : replace_map) {
+        size_t start_pos = 0;
+        while ((start_pos = cell.find(pair.first, start_pos)) !=
+               std::string::npos) {
+          outfile << CYAN << "Replacing " << pair.first << " with "
+                  << pair.second << " in " << cell << RESET << std::endl;
+          cell.replace(start_pos, pair.first.length(), pair.second);
+          start_pos += pair.second.length();
+        }
+      }
       if (isFloat(cell)) {
         cell = formatFloat(cell);  // Format floats to a standard representation
       } else {
@@ -457,9 +474,12 @@ bool compare_row(std::vector<Result> &results) {
 
   // Normalize and sort all DBMS results
   for (const auto &result : normal_results) {
-    sorted_results[result.target] = normalizeValues(result.result);
-    std::sort(sorted_results[result.target].begin(),
-              sorted_results[result.target].end());
+    auto normalized_result =
+        normalizeValues(result.result);  // Get normalized values
+    std::sort(normalized_result.begin(),
+              normalized_result.end());  // Sort normalized values
+    sorted_results[result.target] =
+        normalized_result;  // Store sorted, normalized results
   }
 
   // Use the first DBMS's sorted result as the baseline for comparison
@@ -473,7 +493,6 @@ bool compare_row(std::vector<Result> &results) {
     const auto &sorted_result = sorted_results[result.target];
     if (result.target == reference_target->first)
       continue;  // Skip comparison with the reference
-
     if (sorted_reference != sorted_result) {
       outfile << "Row mismatch detected for target "
               << target_to_string(result.target) << ":" << std::endl;
@@ -482,10 +501,14 @@ bool compare_row(std::vector<Result> &results) {
       for (const auto &dbms_result : normal_results) {
         std::string target_name = target_to_string(dbms_result.target);
         outfile << "  " << target_name << ": [ ";
-        for (const auto &row : dbms_result.result) {
+        for (const auto &row :
+             sorted_results[dbms_result.target]) {  // Use normalized and sorted
+                                                    // result for printing
           outfile << "[ ";
           for (const auto &col : row) {
-            outfile << col << " ";
+            // outfile << col << " ";
+            // as hex
+            outfile << std::hex << col << " ";
           }
           outfile << "] ";
         }
@@ -493,7 +516,7 @@ bool compare_row(std::vector<Result> &results) {
       }
 
       match = false;
-      results = normal_results;
+      results = normal_results;  // Store the filtered results
     }
   }
 

@@ -130,6 +130,7 @@ ExecutionStatus OracleClient::execute(
           clean_up_connection(env, err, svc);
           return kSemanticError;
         }
+        oracle_logfile << "Column " << i << " defined" << std::endl;
       }
 
       // Execute the query
@@ -147,14 +148,40 @@ ExecutionStatus OracleClient::execute(
         clean_up_connection(env, err, svc);
         return kSemanticError;
       }
-      while (OCIStmtFetch2(stmt, err, 1, OCI_FETCH_NEXT, 0, OCI_DEFAULT) ==
-             OCI_SUCCESS) {
+      oracle_logfile << "SELECT query executed" << std::endl;
+      // add error handling
+      while (1) {
+        if (OCIStmtFetch2(stmt, err, 1, OCI_FETCH_NEXT, 0, OCI_DEFAULT) !=
+            OCI_SUCCESS) {
+          oracle_logfile << "Failed to fetch result" << std::endl;
+          text errbuf[512];
+          sb4 errcode;
+          OCIErrorGet(err, 1, NULL, &errcode, errbuf, sizeof(errbuf),
+                      OCI_HTYPE_ERROR);
+          oracle_logfile << "Error - " << errbuf << std::endl;
+          clean_up_connection(env, err, svc);
+          return kSemanticError;
+        }
         std::vector<std::string> row;
+        oracle_logfile << "Result: ";
         for (ub4 i = 1; i <= columnCount; i++) {
           row.push_back(result_string[i]);
+          oracle_logfile << result_string[i] << " ";
         }
+        oracle_logfile << std::endl;
         result.push_back(row);
       }
+      // while (OCIStmtFetch2(stmt, err, 1, OCI_FETCH_NEXT, 0, OCI_DEFAULT) ==
+      //        OCI_SUCCESS) {
+      //   std::vector<std::string> row;
+      //   oracle_logfile << "Result: ";
+      //   for (ub4 i = 1; i <= columnCount; i++) {
+      //     row.push_back(result_string[i]);
+      //     oracle_logfile << result_string[i] << " ";
+      //   }
+      //   oracle_logfile << std::endl;
+      //   result.push_back(row);
+      // }
     } else {
       // For non-SELECT statements, simply execute
       if (OCIStmtExecute(svc, stmt, err, 1, 0, nullptr, nullptr, OCI_DEFAULT) !=
