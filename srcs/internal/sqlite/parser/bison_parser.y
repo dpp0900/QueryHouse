@@ -18,11 +18,9 @@
 #include <string.h>
 
 
-int yyerror(YYLTYPE* llocp, Program * result, yyscan_t scanner, const char *msg) {
-    return 0;
-}
+int yyerror(YYLTYPE* llocp, Program * result, yyscan_t scanner, const char *msg);
 
-%}
+%} 
 /*********************************
  ** Section 2: Bison Parser Declarations
  *********************************/
@@ -31,7 +29,6 @@ int yyerror(YYLTYPE* llocp, Program * result, yyscan_t scanner, const char *msg)
 // Specify code that is included in the generated .h and .c files
 %code requires {
 // %code requires block
-
 
 #include "../include/ast.h"
 #include "../include/define.h"
@@ -98,6 +95,21 @@ int yyerror(YYLTYPE* llocp, Program * result, yyscan_t scanner, const char *msg)
     char* sval;
     uintmax_t uval;
     bool bval;
+
+    /* add k */
+    Action_type* Action_type_t;
+    opt_ForeignKeylist* opt_ForeignKeylist_t;
+    ForeignKeylist* ForeignKeylist_t;
+    ForeignKey* ForeignKey_t;
+    ColumnInParen* Column_In_Paren_t;
+    ForeignKeyColumn* ForeignKeyColumn_t;
+    ForeignKeyRef* ForeignKeyRef_t;
+    FkNoOptstmt* FkNoOptstmt_t;
+    opt_Actiontypelist* opt_Actiontypelist_t;
+    Action_typelist* Action_typelist_t;
+    CreateInparan* CreateInparan_t;
+    /* end k */
+
 
     Program* program_t;
     StatementList* statement_list_t;
@@ -315,14 +327,30 @@ int yyerror(YYLTYPE* llocp, Program * result, yyscan_t scanner, const char *msg)
 %token ARRAY CONCAT ILIKE SECOND MINUTE HOUR DAY MONTH YEAR
 %token TRUE FALSE
 
-/* For SQLite
-*/
+/* For Queryhouse Type-I Scenarios */
+%token FOREIGN REFERENCES ACTION JSON 
+
 
 %token  PRAGMA REINDEX GENERATED ALWAYS CHECK CONFLICT IGNORE REPLACE ROLLBACK
 %token ABORT FAIL AUTOINCR BEGIN TRIGGER TEMP INSTEAD EACH ROW OVER FILTER PARTITION
 %token  CURRENT EXCLUDE FOLLOWING GROUPS NO OTHERS PRECEDING RANGE ROWS TIES UNBOUNDED WINDOW
 %token  ATTACH DETACH DATABASE INDEXED CAST SAVEPOINT RELEASE VACUUM TRANSACTION DEFFERED EXCLUSIVE
 %token IMEDIATE COMMIT GLOB MATCH REGEX NOTHING NULLS LAST FIRST DO COLLATE
+
+
+/* Add k */
+%type <opt_ForeignKeylist_t> opt_ForeignKeylist
+%type <ForeignKey_t> ForeignKey
+%type <ForeignKeylist_t> ForeignKeylist
+%type <Action_type_t> Action_type
+%type <Column_In_Paren_t> ColumnInParen
+%type <ForeignKeyColumn_t> ForeignKeyColumn
+%type <ForeignKeyRef_t> ForeignKeyRef
+%type <FkNoOptstmt_t> FkNoOptstmt
+%type <opt_Actiontypelist_t> opt_Actiontypelist
+%type <Action_typelist_t> Action_typelist
+%type <CreateInparan_t> CreateInparan
+/* endl k */
 
 %type <program_t>	input
 %type <statement_list_t>	statement_list
@@ -582,6 +610,7 @@ statement_list:
         statement {
             $$ = new StatementList();
             $$->v_statement_list_.push_back($1);
+            
         }
     |   statement_list ';' statement {
             $1->v_statement_list_.push_back($3);
@@ -1153,13 +1182,14 @@ create_statement:
             $$->file_path_ = $8;
             $$->table_name_->table_name_->id_type_ = id_create_table_name;
         }
-    |   CREATE TABLE opt_not_exists table_name '(' column_def_commalist ')' {
+    |   CREATE TABLE opt_not_exists table_name '(' CreateInparan ')' {
             $$ = new CreateStatement();
             $$->sub_type_ = CASE1;
             $$->opt_not_exists_ = $3;
             $$->table_name_ = $4;
-            $$->column_def_comma_list_ = $6;
+            $$->CreateInparan_ = $6;
             $$->table_name_->table_name_->id_type_ = id_create_table_name;
+            
         }
     |   CREATE TABLE opt_not_exists table_name AS select_statement {
             $$ = new CreateStatement();
@@ -1222,6 +1252,119 @@ create_statement:
             $$->trigger_cmd_list_ = $4;
         } 
     ;
+/* add k */
+CreateInparan:
+    column_def_commalist opt_ForeignKeylist {
+        $$ = new CreateInparan(); $$->column_def_commalist_ = $1; $$->opt_ForeignKeylist_ = $2; }
+    ;
+
+opt_ForeignKeylist:
+        ',' ForeignKeylist {$$ = new opt_ForeignKeylist(); $$->sub_type_ = CASE0; $$->ForeignKeylist_ = $2;}
+    |   /* empty */ {$$ = new opt_ForeignKeylist(); $$->sub_type_ = CASE1;}
+    ;
+
+ForeignKeylist:
+        ForeignKeylist ',' ForeignKey {
+            $1->v_ForeignKey.push_back($3); 
+            $$ = $1;
+        }
+    |   ForeignKey {
+        $$ = new ForeignKeylist(); 
+        $$->v_ForeignKey.push_back($1);
+        }
+    ;
+
+ForeignKey:
+       FkNoOptstmt opt_Actiontypelist {
+            $$ = new ForeignKey();
+            $$->FkNoOptstmt_ = $1;
+            $$->opt_Actiontypelist_ = $2;
+    }
+    ;
+
+FkNoOptstmt:
+    ForeignKeyColumn ForeignKeyRef {
+        $$ = new FkNoOptstmt();
+        $$->ForeignKeyColumn_ = $1;
+        $$->ForeignKeyRef_ = $2;
+    }
+    ;
+
+ForeignKeyColumn:
+    FOREIGN KEY ColumnInParen {
+        $$ = new ForeignKeyColumn();
+        $$->column_name_ = $3;
+    }
+    ;
+
+ForeignKeyRef:
+    REFERENCES table_name ColumnInParen {
+        $$ = new ForeignKeyRef();
+        $$->table_name_ = $2;
+        $$->column_name_ = $3;
+    }
+    ;
+
+opt_Actiontypelist:
+        Action_typelist {$$ = new opt_Actiontypelist(); $$->sub_type_ = CASE0; $$->Action_typelist_ = $1;}
+    |   /* empty */ {$$ = new opt_Actiontypelist(); $$->sub_type_ = CASE1;}
+    ;
+    
+Action_typelist:
+        Action_typelist  Action_type {
+            $1->v_Action_type.push_back($2); 
+            $$ = $1;
+            }
+    |   Action_type {
+        $$ = new Action_typelist(); 
+        $$->v_Action_type.push_back($1);
+        }
+    ;
+
+Action_type:
+    ON DELETE CASCADE { 
+        $$ = new Action_type(); 
+        $$->str_val_ = string("ON DELETE CASCADE"); 
+    }
+    | ON DELETE SET NULL { 
+        $$ = new Action_type(); 
+        $$->str_val_ = string("ON DELETE SET NULL"); 
+    }
+    | ON DELETE RESTRICT { 
+        $$ = new Action_type(); 
+        $$->str_val_ = string("ON DELETE RESTRICT"); 
+    }
+    | ON DELETE NO ACTION { 
+        $$ = new Action_type(); 
+        $$->str_val_ = string("ON DELETE NO ACTION"); 
+    }
+    | ON UPDATE CASCADE { 
+        $$ = new Action_type(); 
+        $$->str_val_ = string("ON UPDATE CASCADE"); 
+    }
+    | ON UPDATE SET NULL { 
+        $$ = new Action_type(); 
+        $$->str_val_ = string("ON UPDATE SET NULL"); 
+    }
+    | ON UPDATE RESTRICT { 
+        $$ = new Action_type(); 
+        $$->str_val_ = string("ON UPDATE RESTRICT"); 
+    }
+    | ON UPDATE NO ACTION { 
+        $$ = new Action_type(); 
+        $$->str_val_ = string("ON UPDATE NO ACTION"); 
+    }
+    ;
+
+/* 확장 -> 괄호 안에 여러개의 column */ 
+ColumnInParen:
+       '(' column_name ')' {
+        $$ = new ColumnInParen();
+        $$->column_name_ = $2;
+    }
+    ;
+/* end k */
+
 
 opt_unique:
         UNIQUE {$$ = new OptUnique(); $$->str_val_ = string("UNIQUE");}
@@ -1308,11 +1451,11 @@ opt_not_exists:
 column_def_commalist:
         column_def { 
             $$ = new ColumnDefCommaList(); 
-            $$->v_column_def_comma_list_.push_back($1); 
-            }
+            $$->v_column_def_comma_list_.push_back($1);
+        }
     |   column_def_commalist ',' column_def { 
-        $1->v_column_def_comma_list_.push_back($3); 
-        $$ = $1; 
+            $1->v_column_def_comma_list_.push_back($3);
+            $$ = $1;
         }
     ;
 
@@ -1358,7 +1501,6 @@ column_arg:
     |   AS '(' expr ')' {$$ = new ColumnArg(); $$->sub_type_ = CASE5; $$->expr_ = $3;}
     |   CHECK '(' expr ')' {$$ = new ColumnArg(); $$->sub_type_ = CASE6; $$->expr_ = $3;}
     ;
-
 
 opt_on_conflict: 
         ON CONFLICT resolve_type {$$ = new OptOnConflict(); $$->sub_type_ = CASE0; $$->resolve_type_ = $3;}
@@ -2327,4 +2469,11 @@ ident_commalist:
  ** Section 4: Additional C code
  *********************************/
 
-/* empty */
+ /* empty */
+ int yyerror(YYLTYPE* llocp, Program* result, yyscan_t scanner, const char* msg) {
+    std::cerr << "[Bison Error] " << msg << std::endl;
+    if (llocp) {
+        std::cerr << "At line " << llocp->first_line << ", column " << llocp->first_column << std::endl;
+    }
+    return 1;
+}

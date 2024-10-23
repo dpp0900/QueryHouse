@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 
+
 #include "../include/mutator.h"
 #include "../include/utils.h"
 
@@ -289,24 +290,26 @@ IR *CreateStatement::translate(vector<IR *> &v_ir_collector) {
   TRANSLATESTART
 
   SWITCHSTART
-  CASESTART(0)
+
+  CASESTART(0)  // CREATE TABLE FROM TBL FILE
   auto tmp1 = SAFETRANSLATE(opt_not_exists_);
   auto tmp2 = SAFETRANSLATE(table_name_);
   auto tmp = new IR(kUnknown, OP0(), tmp1, tmp2);
   PUSH(tmp);
   auto tmp3 = SAFETRANSLATE(file_path_);
-  res =
-      new IR(kCreateStatement, OP2("CREATE TABLE", "FROM TBL FILE"), tmp, tmp3);
+  res = new IR(kCreateStatement, OP2("CREATE TABLE", "FROM TBL FILE"), tmp, tmp3);
   CASEEND
+
   CASESTART(1)
   auto tmp1 = SAFETRANSLATE(opt_not_exists_);
   auto tmp2 = SAFETRANSLATE(table_name_);
   auto tmp = new IR(kUnknown, OP0(), tmp1, tmp2);
   PUSH(tmp);
-  auto tmp3 = SAFETRANSLATE(column_def_comma_list_);
+  auto tmp3 = SAFETRANSLATE(CreateInparan_);
   res = new IR(kCreateStatement, OP3("CREATE TABLE", "(", ")"), tmp, tmp3);
   CASEEND
-  CASESTART(2)
+
+  CASESTART(2)  // CREATE TABLE AS SELECT
   auto tmp1 = SAFETRANSLATE(opt_not_exists_);
   auto tmp2 = SAFETRANSLATE(table_name_);
   auto tmp = new IR(kUnknown, OP0(), tmp1, tmp2);
@@ -314,7 +317,8 @@ IR *CreateStatement::translate(vector<IR *> &v_ir_collector) {
   auto tmp3 = SAFETRANSLATE(select_statement_);
   res = new IR(kCreateStatement, OP2("CREATE TABLE", "AS"), tmp, tmp3);
   CASEEND
-  CASESTART(3)
+
+  CASESTART(3)  // CREATE VIEW AS SELECT
   auto tmp1 = SAFETRANSLATE(opt_not_exists_);
   auto tmp2 = SAFETRANSLATE(table_name_);
   auto tmp = new IR(kUnknown, OP0(), tmp1, tmp2);
@@ -325,7 +329,8 @@ IR *CreateStatement::translate(vector<IR *> &v_ir_collector) {
   auto tmp5 = SAFETRANSLATE(select_statement_);
   res = new IR(kCreateStatement, OP2("CREATE VIEW", "AS"), tmp4, tmp5);
   CASEEND
-  CASESTART(4)
+
+  CASESTART(4)  // CREATE INDEX
   auto tmp1 = SAFETRANSLATE(opt_unique_);
   auto tmp2 = SAFETRANSLATE(opt_not_exists_);
   res = new IR(kUnknown, OP2("CREATE", "INDEX"), tmp1, tmp2);
@@ -342,15 +347,18 @@ IR *CreateStatement::translate(vector<IR *> &v_ir_collector) {
   auto tmp6 = SAFETRANSLATE(opt_where_);
   res = new IR(kCreateStatement, OP0(), res, tmp6);
   CASEEND
-  CASESTART(5)
+
+  CASESTART(5)  // CREATE VIRTUAL TABLE
   auto tmp1 = SAFETRANSLATE(opt_not_exists_);
   auto tmp2 = SAFETRANSLATE(table_name_);
   res = new IR(kUnknown, OP1("CREATE VIRTUAL TABLE"), tmp1, tmp2);
   PUSH(res);
   auto tmp3 = SAFETRANSLATE(module_name_);
   res = new IR(kCreateStatement, OPMID("USING"), res, tmp3);
+
   CASEEND
-  CASESTART(6)
+
+  CASESTART(6)  // CREATE VIRTUAL TABLE with columns
   auto tmp1 = SAFETRANSLATE(opt_not_exists_);
   auto tmp2 = SAFETRANSLATE(table_name_);
   res = new IR(kUnknown, OP1("CREATE VIRTUAL TABLE"), tmp1, tmp2);
@@ -361,14 +369,17 @@ IR *CreateStatement::translate(vector<IR *> &v_ir_collector) {
   auto tmp4 = SAFETRANSLATE(column_def_comma_list_);
   res = new IR(kCreateStatement, OP3("", "(", ")"), res, tmp4);
   CASEEND
-  CASESTART(7)
+
+  CASESTART(7)  // CREATE TRIGGER
   auto tmp1 = SAFETRANSLATE(trigger_declare_);
   auto tmp2 = SAFETRANSLATE(trigger_cmd_list_);
   res = new IR(kCreateStatement, OP3("CREATE", "BEGIN", "END"), tmp1, tmp2);
   CASEEND
+
   SWITCHEND
   TRANSLATEEND
 }
+
 
 IR *InsertStatement::translate(vector<IR *> &v_ir_collector) {
   TRANSLATESTART
@@ -1662,6 +1673,7 @@ void CreateStatement::deep_delete() {
   SAFEDELETE(module_name_);
   SAFEDELETE(trigger_declare_);
   SAFEDELETE(trigger_cmd_list_);
+  SAFEDELETE(CreateInparan_);
   delete this;
 }
 
@@ -2340,41 +2352,70 @@ void ColumnArglist::deep_delete() {
 IR *ColumnArg::translate(vector<IR *> &v_ir_collector) {
   TRANSLATESTART
   SWITCHSTART
-  CASESTART(0)
-  res = SAFETRANSLATE(opt_on_conflict_);
-  res = new IR(kColumnArg, OP1("NULL"), res);
-  CASEEND
-  CASESTART(1)
-  res = SAFETRANSLATE(opt_on_conflict_);
-  res = new IR(kColumnArg, OP1("NOT NULL"), res);
-  CASEEND
-  CASESTART(2)
-  auto tmp = SAFETRANSLATE(opt_order_type_);
-  auto tmp1 = SAFETRANSLATE(opt_on_conflict_);
-  res = new IR(kColumnArg, OP1("PRIMARY KEY"), tmp, tmp1);
-  PUSH(res);
-  tmp = SAFETRANSLATE(opt_autoinc_);
-  res = new IR(kColumnArg, OP0(), res, tmp);
-  CASEEND
-  CASESTART(3)
-  res = SAFETRANSLATE(opt_on_conflict_);
-  res = new IR(kColumnArg, OP1("UNIQUE"), res);
-  CASEEND
-  CASESTART(4)
-  res = SAFETRANSLATE(expr_);
-  res = new IR(kColumnArg, OP2("GENERATED ALWAYS AS(", ")"), res);
-  CASEEND
-  CASESTART(5)
-  res = SAFETRANSLATE(expr_);
-  res = new IR(kColumnArg, OP2("AS(", ")"), res);
-  CASEEND
-  CASESTART(6)
-  res = SAFETRANSLATE(expr_);
-  res = new IR(kColumnArg, OP2("CHECK(", ")"), res);
-  CASEEND
+
+  {  // Scope for case 0
+    CASESTART(0)
+    res = SAFETRANSLATE(opt_on_conflict_);
+    res = new IR(kColumnArg, OP1("NULL"), res);
+    CASEEND
+  }
+
+  {  // Scope for case 1
+    CASESTART(1)
+    res = SAFETRANSLATE(opt_on_conflict_);
+    res = new IR(kColumnArg, OP1("NOT NULL"), res);
+    CASEEND
+  }
+
+  {  // Scope for case 2
+    CASESTART(2)
+    auto tmp = SAFETRANSLATE(opt_order_type_);
+    auto tmp1 = SAFETRANSLATE(opt_on_conflict_);
+    res = new IR(kColumnArg, OP1("PRIMARY KEY"), tmp, tmp1);
+    PUSH(res);
+    tmp = SAFETRANSLATE(opt_autoinc_);
+    res = new IR(kColumnArg, OP0(), res, tmp);
+    CASEEND
+  }
+
+  {  // Scope for case 3
+    CASESTART(3)
+    res = SAFETRANSLATE(opt_on_conflict_);
+    res = new IR(kColumnArg, OP1("UNIQUE"), res);
+    CASEEND
+  }
+
+  {  // Scope for case 4
+    CASESTART(4)
+    res = SAFETRANSLATE(expr_);
+    res = new IR(kColumnArg, OP2("GENERATED ALWAYS AS(", ")"), res);
+    CASEEND
+  }
+
+  {  // Scope for case 5
+    CASESTART(5)
+    res = SAFETRANSLATE(expr_);
+    res = new IR(kColumnArg, OP2("AS(", ")"), res);
+    CASEEND
+  }
+
+  {  // Scope for case 6
+    CASESTART(6)
+    res = SAFETRANSLATE(expr_);
+    res = new IR(kColumnArg, OP2("CHECK(", ")"), res);
+    CASEEND
+  }
+
+  {  // Scope for case 7
+    CASESTART(7)
+    auto tmp2 = SAFETRANSLATE(opt_autoinc_);
+    res = new IR(kColumnArg, OP1("PRIMARY KEY"), tmp2);
+    CASEEND
+  }
   SWITCHEND
   TRANSLATEEND
 }
+
 
 void ColumnArg::deep_delete() {
   SAFEDELETE(opt_on_conflict_);
@@ -3591,3 +3632,171 @@ IR *OptUpsertClause::translate(vector<IR *> &v_ir_collector) {
 
   TRANSLATEEND
 }
+
+/* ADD K */
+IR *ColumnInParen::translate(vector<IR *> &v_ir_collector) {
+  TRANSLATESTART
+  auto name = SAFETRANSLATE(column_name_);
+  res = new IR(kColumnName, OP3("(", "", ")"), name);
+  TRANSLATEEND
+}
+
+void ColumnInParen::deep_delete(){
+  SAFEDELETE(column_name_);
+
+  delete this;
+}
+
+IR *opt_ForeignKeylist::translate(vector<IR *> &v_ir_collector){
+  TRANSLATESTART
+
+  SWITCHSTART
+  CASESTART(0)
+  auto tmp = SAFETRANSLATE(ForeignKeylist_);
+  res = new IR(kopt_ForeignKeylist, OP2(",", ""), tmp);
+  CASEEND
+  CASESTART(1)
+  res = new IR(kopt_ForeignKeylist, string(""));
+  CASEEND
+  SWITCHEND
+
+  TRANSLATEEND
+}
+
+void opt_ForeignKeylist::deep_delete() {
+  SAFEDELETE(ForeignKeylist_);
+  delete this;
+}
+
+IR *ForeignKeylist::translate(vector<IR *> &v_ir_collector) {
+  TRANSLATESTART
+
+  TRANSLATELIST(kForeignKeylist, v_ForeignKey, ", ");
+
+  TRANSLATEENDNOPUSH
+}
+
+void ForeignKeylist::deep_delete() {
+  SAFEDELETELIST(v_ForeignKey);
+  delete this;
+}
+
+IR *ForeignKeyRef::translate(vector<IR *> &v_ir_collector) {
+  TRANSLATESTART
+  auto tmp = SAFETRANSLATE(table_name_);
+  auto tmp1 = SAFETRANSLATE(column_name_);
+  res = new IR(kForeignKeyRef, OP3("REFERENCES", "", ""), tmp, tmp1);
+  TRANSLATEEND
+}
+
+void ForeignKeyRef::deep_delete() {
+  SAFEDELETE(table_name_);
+  SAFEDELETE(column_name_);
+  delete this;
+}
+
+
+IR *opt_Actiontypelist::translate(vector<IR *> &v_ir_collector) {
+  TRANSLATESTART
+  SWITCHSTART
+  CASESTART(0)
+  auto tmp = SAFETRANSLATE(Action_typelist_);
+  res = new IR(kopt_Actiontypelist, OP0(), tmp);
+  CASEEND
+  CASESTART(1)
+  res = new IR(kopt_Actiontypelist, "");
+  CASEEND
+  SWITCHEND
+  TRANSLATEEND
+}
+
+void opt_Actiontypelist::deep_delete() {
+  SAFEDELETE(Action_typelist_);
+  delete this;
+}
+
+IR *Action_typelist::translate(vector<IR *> &v_ir_collector) {
+  TRANSLATESTART
+
+  TRANSLATELIST(kAction_typelist, v_Action_type, " ");
+
+  TRANSLATEENDNOPUSH
+}
+
+void Action_typelist::deep_delete() {
+  SAFEDELETELIST(v_Action_type);
+  delete this;
+}
+
+IR *Action_type::translate(vector<IR *> &v_ir_collector){
+  TRANSLATESTART
+  res = new IR(kAction_type, str_val_);
+  TRANSLATEEND
+}
+
+void Action_type::deep_delete(){ delete this; }
+
+IR *ForeignKeyColumn::translate(vector<IR *> &v_ir_collector){
+  TRANSLATESTART
+  auto tmp = SAFETRANSLATE(column_name_);
+  res = new IR(kForeignKeyColumn, OP2("FOREIGN KEY", ""), tmp);
+  TRANSLATEEND
+}
+
+void ForeignKeyColumn::deep_delete(){ 
+  SAFEDELETE(column_name_);
+  delete this; 
+}
+
+IR *FkNoOptstmt::translate(vector<IR *> &v_ir_collector){
+  TRANSLATESTART
+  auto tmp = SAFETRANSLATE(ForeignKeyColumn_);
+  auto tmp1 = SAFETRANSLATE(ForeignKeyRef_);
+  res = new IR(kFkNoOptstmt, OP2("", ""), tmp, tmp1);
+  TRANSLATEEND
+}
+
+void FkNoOptstmt::deep_delete(){ 
+  SAFEDELETE(ForeignKeyColumn_);
+  SAFEDELETE(ForeignKeyRef_);
+  delete this; 
+}
+
+IR *ForeignKey::translate(vector<IR *> &v_ir_collector) {
+  TRANSLATESTART
+  SWITCHSTART
+  CASESTART(0)
+  // 외래 키 정의를 변환 (재귀적으로 추가)
+  auto tmp1 = SAFETRANSLATE(FkNoOptstmt_);
+  auto tmp2 = SAFETRANSLATE(opt_Actiontypelist_);
+  res = new IR(kForeignKey, OP2("", ""), tmp1, tmp2);
+  CASEEND
+
+  CASESTART(1)
+  res = new IR(kForeignKey, string(""));
+  CASEEND
+  SWITCHEND
+  TRANSLATEENDNOPUSH
+}
+
+void ForeignKey::deep_delete() {
+  SAFEDELETE(FkNoOptstmt_);
+  SAFEDELETE(opt_Actiontypelist_);
+  delete this;
+}
+
+IR *CreateInparan::translate(vector<IR *> &v_ir_collector) {
+  TRANSLATESTART
+  auto tmp1 = SAFETRANSLATE(column_def_commalist_);
+  auto tmp2 = SAFETRANSLATE(opt_ForeignKeylist_);
+  res = new IR(kCreateInparan, OP3("", "", ""), tmp1, tmp2);
+  TRANSLATEENDNOPUSH
+}
+
+void CreateInparan::deep_delete() {
+  SAFEDELETE(column_def_commalist_);
+  SAFEDELETE(opt_ForeignKeylist_);
+  delete this;
+}
+
+/* end K */

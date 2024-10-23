@@ -3,6 +3,17 @@
 #define __DEFINE_H__
 
 #define ALLTYPE(V)          \
+  V(kForeignKey)            \
+  V(kForeignKeyColumn)      \
+  V(kAction_type)           \
+  V(kopt_Actiontypelist)    \
+  V(kAction_typelist)       \
+  V(kForeignKeyRef)         \
+  V(kFkNoOptstmt)           \
+  V(kColumnInParen)         \
+  V(kopt_ForeignKeylist)    \
+  V(kCreateInparan)         \
+  V(kForeignKeylist)        \
   V(kIR)                    \
   V(kIROperator)            \
   V(kNode)                  \
@@ -187,6 +198,17 @@
   V(kOptUpsertClause)
 
 #define ALLCLASS(V)        \
+  V(ForeignKey)            \
+  V(ForeignKeyColumn)      \
+  V(Action_type)           \
+  V(opt_Actiontypelist)    \
+  V(Action_typelist)       \
+  V(ForeignKeyRef)         \
+  V(FkNoOptstmt)           \
+  V(ColumnInParen)         \
+  V(opt_ForeignKeylist)    \
+  V(CreateInparan)         \
+  V(ForeignKeylist)        \
   V(IR)                    \
   V(IROperator)            \
   V(Node)                  \
@@ -393,8 +415,7 @@
 
 #define SAFETRANSLATE(a) (assert(a != NULL), a->translate(v_ir_collector))
 
-#define SAFEDELETE(a) \
-  if (a != NULL) a->deep_delete()
+#define SAFEDELETE(a) do { if ((a) != NULL) (a)->deep_delete(); } while (0)
 
 #define SAFEDELETELIST(a) \
   for (auto _i : a) SAFEDELETE(_i)

@@ -58,9 +58,16 @@ char* substr(const char* source, int from, int to);
 --				BEGIN(COMMENT);
 <COMMENT>[^\n]*	/* skipping comment content until a end of line is read */;
 <COMMENT>\n 	BEGIN(INITIAL);
-TOKEN(NEW_KEYWORD)
+TOKEN(NEW_KEYWORD) 
 [ \t\n]+	/* skip whitespace */;
 
+
+
+ /* FOR Queryhouse */
+FOREIGN		TOKEN(FOREIGN)
+REFERENCES	TOKEN(REFERENCES)
+ACTION		TOKEN(ACTION)
+JSON		TOKEN(JSON)
 
 DEALLOCATE	TOKEN(DEALLOCATE)
 PARAMETERS	TOKEN(PARAMETERS)
