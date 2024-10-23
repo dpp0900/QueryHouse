@@ -53,10 +53,9 @@
 extern int hsql_debug;
 #endif
 /* "%code requires" blocks.  */
-#line 32 "bison_parser.y"
+#line 30 "bison_parser.y"
 
 // %code requires block
-
 
 #include "../include/ast.h"
 #include "../include/define.h"
@@ -80,7 +79,7 @@ extern int hsql_debug;
                 } \
         }
 
-#line 84 "bison_parser.h"
+#line 83 "bison_parser.h"
 
 /* Token kinds.  */
 #ifndef HSQL_TOKENTYPE
@@ -226,85 +225,104 @@ extern int hsql_debug;
     SQL_YEAR = 390,                /* YEAR  */
     SQL_TRUE = 391,                /* TRUE  */
     SQL_FALSE = 392,               /* FALSE  */
-    SQL_PRAGMA = 393,              /* PRAGMA  */
-    SQL_REINDEX = 394,             /* REINDEX  */
-    SQL_GENERATED = 395,           /* GENERATED  */
-    SQL_ALWAYS = 396,              /* ALWAYS  */
-    SQL_CHECK = 397,               /* CHECK  */
-    SQL_CONFLICT = 398,            /* CONFLICT  */
-    SQL_IGNORE = 399,              /* IGNORE  */
-    SQL_REPLACE = 400,             /* REPLACE  */
-    SQL_ROLLBACK = 401,            /* ROLLBACK  */
-    SQL_ABORT = 402,               /* ABORT  */
-    SQL_FAIL = 403,                /* FAIL  */
-    SQL_AUTOINCR = 404,            /* AUTOINCR  */
-    SQL_BEGIN = 405,               /* BEGIN  */
-    SQL_TRIGGER = 406,             /* TRIGGER  */
-    SQL_TEMP = 407,                /* TEMP  */
-    SQL_INSTEAD = 408,             /* INSTEAD  */
-    SQL_EACH = 409,                /* EACH  */
-    SQL_ROW = 410,                 /* ROW  */
-    SQL_OVER = 411,                /* OVER  */
-    SQL_FILTER = 412,              /* FILTER  */
-    SQL_PARTITION = 413,           /* PARTITION  */
-    SQL_CURRENT = 414,             /* CURRENT  */
-    SQL_EXCLUDE = 415,             /* EXCLUDE  */
-    SQL_FOLLOWING = 416,           /* FOLLOWING  */
-    SQL_GROUPS = 417,              /* GROUPS  */
-    SQL_NO = 418,                  /* NO  */
-    SQL_OTHERS = 419,              /* OTHERS  */
-    SQL_PRECEDING = 420,           /* PRECEDING  */
-    SQL_RANGE = 421,               /* RANGE  */
-    SQL_ROWS = 422,                /* ROWS  */
-    SQL_TIES = 423,                /* TIES  */
-    SQL_UNBOUNDED = 424,           /* UNBOUNDED  */
-    SQL_WINDOW = 425,              /* WINDOW  */
-    SQL_ATTACH = 426,              /* ATTACH  */
-    SQL_DETACH = 427,              /* DETACH  */
-    SQL_DATABASE = 428,            /* DATABASE  */
-    SQL_INDEXED = 429,             /* INDEXED  */
-    SQL_CAST = 430,                /* CAST  */
-    SQL_SAVEPOINT = 431,           /* SAVEPOINT  */
-    SQL_RELEASE = 432,             /* RELEASE  */
-    SQL_VACUUM = 433,              /* VACUUM  */
-    SQL_TRANSACTION = 434,         /* TRANSACTION  */
-    SQL_DEFFERED = 435,            /* DEFFERED  */
-    SQL_EXCLUSIVE = 436,           /* EXCLUSIVE  */
-    SQL_IMEDIATE = 437,            /* IMEDIATE  */
-    SQL_COMMIT = 438,              /* COMMIT  */
-    SQL_GLOB = 439,                /* GLOB  */
-    SQL_MATCH = 440,               /* MATCH  */
-    SQL_REGEX = 441,               /* REGEX  */
-    SQL_NOTHING = 442,             /* NOTHING  */
-    SQL_NULLS = 443,               /* NULLS  */
-    SQL_LAST = 444,                /* LAST  */
-    SQL_FIRST = 445,               /* FIRST  */
-    SQL_DO = 446,                  /* DO  */
-    SQL_COLLATE = 447,             /* COLLATE  */
-    SQL_EQUALS = 448,              /* EQUALS  */
-    SQL_NOTEQUALS = 449,           /* NOTEQUALS  */
-    SQL_LESS = 450,                /* LESS  */
-    SQL_GREATER = 451,             /* GREATER  */
-    SQL_LESSEQ = 452,              /* LESSEQ  */
-    SQL_GREATEREQ = 453,           /* GREATEREQ  */
-    SQL_NOTNULL = 454,             /* NOTNULL  */
-    SQL_UMINUS = 455               /* UMINUS  */
+    SQL_FOREIGN = 393,             /* FOREIGN  */
+    SQL_REFERENCES = 394,          /* REFERENCES  */
+    SQL_ACTION = 395,              /* ACTION  */
+    SQL_JSON = 396,                /* JSON  */
+    SQL_PRAGMA = 397,              /* PRAGMA  */
+    SQL_REINDEX = 398,             /* REINDEX  */
+    SQL_GENERATED = 399,           /* GENERATED  */
+    SQL_ALWAYS = 400,              /* ALWAYS  */
+    SQL_CHECK = 401,               /* CHECK  */
+    SQL_CONFLICT = 402,            /* CONFLICT  */
+    SQL_IGNORE = 403,              /* IGNORE  */
+    SQL_REPLACE = 404,             /* REPLACE  */
+    SQL_ROLLBACK = 405,            /* ROLLBACK  */
+    SQL_ABORT = 406,               /* ABORT  */
+    SQL_FAIL = 407,                /* FAIL  */
+    SQL_AUTOINCR = 408,            /* AUTOINCR  */
+    SQL_BEGIN = 409,               /* BEGIN  */
+    SQL_TRIGGER = 410,             /* TRIGGER  */
+    SQL_TEMP = 411,                /* TEMP  */
+    SQL_INSTEAD = 412,             /* INSTEAD  */
+    SQL_EACH = 413,                /* EACH  */
+    SQL_ROW = 414,                 /* ROW  */
+    SQL_OVER = 415,                /* OVER  */
+    SQL_FILTER = 416,              /* FILTER  */
+    SQL_PARTITION = 417,           /* PARTITION  */
+    SQL_CURRENT = 418,             /* CURRENT  */
+    SQL_EXCLUDE = 419,             /* EXCLUDE  */
+    SQL_FOLLOWING = 420,           /* FOLLOWING  */
+    SQL_GROUPS = 421,              /* GROUPS  */
+    SQL_NO = 422,                  /* NO  */
+    SQL_OTHERS = 423,              /* OTHERS  */
+    SQL_PRECEDING = 424,           /* PRECEDING  */
+    SQL_RANGE = 425,               /* RANGE  */
+    SQL_ROWS = 426,                /* ROWS  */
+    SQL_TIES = 427,                /* TIES  */
+    SQL_UNBOUNDED = 428,           /* UNBOUNDED  */
+    SQL_WINDOW = 429,              /* WINDOW  */
+    SQL_ATTACH = 430,              /* ATTACH  */
+    SQL_DETACH = 431,              /* DETACH  */
+    SQL_DATABASE = 432,            /* DATABASE  */
+    SQL_INDEXED = 433,             /* INDEXED  */
+    SQL_CAST = 434,                /* CAST  */
+    SQL_SAVEPOINT = 435,           /* SAVEPOINT  */
+    SQL_RELEASE = 436,             /* RELEASE  */
+    SQL_VACUUM = 437,              /* VACUUM  */
+    SQL_TRANSACTION = 438,         /* TRANSACTION  */
+    SQL_DEFFERED = 439,            /* DEFFERED  */
+    SQL_EXCLUSIVE = 440,           /* EXCLUSIVE  */
+    SQL_IMEDIATE = 441,            /* IMEDIATE  */
+    SQL_COMMIT = 442,              /* COMMIT  */
+    SQL_GLOB = 443,                /* GLOB  */
+    SQL_MATCH = 444,               /* MATCH  */
+    SQL_REGEX = 445,               /* REGEX  */
+    SQL_NOTHING = 446,             /* NOTHING  */
+    SQL_NULLS = 447,               /* NULLS  */
+    SQL_LAST = 448,                /* LAST  */
+    SQL_FIRST = 449,               /* FIRST  */
+    SQL_DO = 450,                  /* DO  */
+    SQL_COLLATE = 451,             /* COLLATE  */
+    SQL_EQUALS = 452,              /* EQUALS  */
+    SQL_NOTEQUALS = 453,           /* NOTEQUALS  */
+    SQL_LESS = 454,                /* LESS  */
+    SQL_GREATER = 455,             /* GREATER  */
+    SQL_LESSEQ = 456,              /* LESSEQ  */
+    SQL_GREATEREQ = 457,           /* GREATEREQ  */
+    SQL_NOTNULL = 458,             /* NOTNULL  */
+    SQL_UMINUS = 459               /* UMINUS  */
   };
   typedef enum hsql_tokentype hsql_token_kind_t;
 #endif
 
 /* Value type.  */
 #if ! defined HSQL_STYPE && ! defined HSQL_STYPE_IS_DECLARED
-#line 95 "bison_parser.y"
+#line 92 "bison_parser.y"
 union HSQL_STYPE
 {
-#line 95 "bison_parser.y"
+#line 92 "bison_parser.y"
 
     double fval;
     int64_t ival;
     char* sval;
     uintmax_t uval;
     bool bval;
+
+    /* add k */
+    Action_type* Action_type_t;
+    opt_ForeignKeylist* opt_ForeignKeylist_t;
+    ForeignKeylist* ForeignKeylist_t;
+    ForeignKey* ForeignKey_t;
+    ColumnInParen* Column_In_Paren_t;
+    ForeignKeyColumn* ForeignKeyColumn_t;
+    ForeignKeyRef* ForeignKeyRef_t;
+    FkNoOptstmt* FkNoOptstmt_t;
+    opt_Actiontypelist* opt_Actiontypelist_t;
+    Action_typelist* Action_typelist_t;
+    CreateInparan* CreateInparan_t;
+    /* end k */
+
 
     Program* program_t;
     StatementList* statement_list_t;
@@ -490,10 +508,10 @@ union HSQL_STYPE
     std::vector<OrderDesc*>* order_vec;
     std::vector<WithDescription*>* with_description_vec;
 
-#line 494 "bison_parser.h"
+#line 512 "bison_parser.h"
 
 };
-#line 95 "bison_parser.y"
+#line 92 "bison_parser.y"
 typedef union HSQL_STYPE HSQL_STYPE;
 # define HSQL_STYPE_IS_TRIVIAL 1
 # define HSQL_STYPE_IS_DECLARED 1
