@@ -640,7 +640,6 @@ bool execute_plan(
 
   return true;
 }
-
 /* memo:
  *
  * void foo(const vector<unique_ptr<client::DBClient>>& db_clients) {
@@ -750,6 +749,463 @@ void report(OraclePlan &plan, uint8_t position, std::vector<Result> &results) {
 
   logfile << "    Position in query: " << static_cast<int>(position) << "\n\n";
 }
+
+/*
+ * postprocess()
+ *
+ * Post-processing on the given `plan` after oracle_planner(), including:
+ *   - Add type-2 diff test scneario
+ *
+ * It can refer to the plan of the original seed `old_plan` as hints.
+ */
+
+void addPragmaCommands(QueryInfo& query_info, std::string& new_query) {
+    if (rand() % 100 < 15) {
+    
+        if (rand() % 100 < 15) {
+            int auto_vacuum_modes[] = {0, 1, 2};  // Auto vacuum modes: NONE (0), FULL (1), INCREMENTAL (2)
+            int selected_vacuum_mode = auto_vacuum_modes[rand() % 3];  // Randomly choose between 0, 1, or 2
+            std::string vacuum_mode = (selected_vacuum_mode == 0) ? "NONE" : (selected_vacuum_mode == 1) ? "FULL" : "INCREMENTAL";
+            new_query += "PRAGMA auto_vacuum = " + vacuum_mode + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            bool enable_automatic_index = rand() % 2 == 0;  // Randomly enable or disable
+            new_query += "PRAGMA automatic_index = " + std::string(enable_automatic_index ? "true" : "false") + "; ";
+            s
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            int busy_timeout = rand() % 5000 + 1000;  // Random timeout between 1000 and 5000 milliseconds
+            new_query += "PRAGMA busy_timeout = " + std::to_string(busy_timeout) + "; ";
+            
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            int cache_size = (rand() % 1000) - 500;  // Random cache size between -500 and 500 (negative for kibibytes)
+            new_query += "PRAGMA cache_size = " + std::to_string(cache_size) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            if (rand() % 2 == 0) {
+                bool cache_spill_enabled = rand() % 2 == 0;  // Randomly enable or disable cache spill
+                new_query += "PRAGMA cache_spill = " + std::string(cache_spill_enabled ? "true" : "false") + "; ";
+            } else {
+                int spill_size = rand() % 1000 + 100;  // Random cache spill size between 100 and 1000 pages
+                new_query += "PRAGMA cache_spill = " + std::to_string(spill_size) + "; ";
+            }
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            bool cell_size_check = rand() % 2 == 0;
+            new_query += "PRAGMA cell_size_check = " + std::string(cell_size_check ? "true" : "false") + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            bool count_changes = rand() % 2 == 0;
+            new_query += "PRAGMA count_changes = " + std::string(count_changes ? "true" : "false") + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            int default_cache_size = rand() % 1000 + 1;  // Random default cache size between 1 and 1000 pages
+            new_query += "PRAGMA default_cache_size = " + std::to_string(default_cache_size) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            int encoding_choice = rand() % 4; 
+            std::string encoding = (encoding_choice == 0) ? "'UTF-8'" : (encoding_choice == 1) ? "'UTF-16'" : (encoding_choice == 2) ? "'UTF-16le'" : "'UTF-16be'";
+            new_query += "PRAGMA encoding = " + encoding + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            std::string journal_modes[] = { "DELETE", "TRUNCATE", "PERSIST", "MEMORY", "WAL", "OFF" };
+            std::string selected_journal_mode = journal_modes[rand() % 6];  // Randomly choose one mode
+            new_query += "PRAGMA journal_mode = " + selected_journal_mode + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            int journal_size_limit = rand() % 10000 + 1000;  // Random journal size limit between 1000 and 10000 bytes
+            new_query += "PRAGMA journal_size_limit = " + std::to_string(journal_size_limit) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            std::string locking_modes[] = { "NORMAL", "EXCLUSIVE" };
+            std::string selected_locking_mode = locking_modes[rand() % 2];  // Randomly choose one mode
+            new_query += "PRAGMA locking_mode = " + selected_locking_mode + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            int max_page_count = rand() % 10000 + 1000;  // Random max page count between 1000 and 10000 pages
+            new_query += "PRAGMA max_page_count = " + std::to_string(max_page_count) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) { 
+            int mmap_size = rand() % 100000 + 1000;  // Random mmap size between 1000 and 100000 bytes
+            new_query += "PRAGMA mmap_size = " + std::to_string(mmap_size) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            int page_size = (1 << (rand() % 7 + 9));  // Random page size between 512 (2^9) and 65536 (2^16) bytes
+            new_query += "PRAGMA page_size = " + std::to_string(page_size) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            bool read_uncommitted = rand() % 2 == 0;
+            new_query += "PRAGMA read_uncommitted = " + std::string(read_uncommitted ? "true" : "false") + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            int schema_version = rand() % 10000;  // Random schema version between 0 and 9999
+            new_query += "PRAGMA schema_version = " + std::to_string(schema_version) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            std::string secure_delete_modes[] = { "false", "true", "FAST" };
+            std::string selected_secure_delete = secure_delete_modes[rand() % 3];  // Randomly choose between OFF, ON, FAST
+            new_query += "PRAGMA secure_delete = " + selected_secure_delete + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {
+            int soft_heap_limit = rand() % 100000 + 10000;  // Random soft heap limit between 10000 and 100000 bytes
+            new_query += "PRAGMA soft_heap_limit = " + std::to_string(soft_heap_limit) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) {  
+            int synchronous_modes[] = { 0, 1, 2, 3 };
+            int selected_synchronous_mode = synchronous_modes[rand() % 4];  // Randomly choose one mode
+            std::string mode_string = (selected_synchronous_mode == 0) ? "OFF" : std::to_string(selected_synchronous_mode);
+            new_query += "PRAGMA synchronous = " + mode_string + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) { 
+            int temp_store_modes[] = { 0, 1, 2 };
+            int selected_temp_store_mode = temp_store_modes[rand() % 3];  // Randomly choose one mode
+            std::string mode_string = (selected_temp_store_mode == 0) ? "DEFAULT" : (selected_temp_store_mode == 1) ? "FILE" : "MEMORY";
+            new_query += "PRAGMA temp_store = " + mode_string + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) { 
+            int max_threads = rand() % 16 + 1;  // Random number of threads between 1 and 16
+            new_query += "PRAGMA threads = " + std::to_string(max_threads) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) { 
+            int wal_autocheckpoint = rand() % 1000 + 1;  // Random WAL autocheckpoint value between 1 and 1000 pages
+            new_query += "PRAGMA wal_autocheckpoint = " + std::to_string(wal_autocheckpoint) + "; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+
+        if (rand() % 100 < 15) { 
+            new_query += "PRAGMA optimize; ";
+
+            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
+                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
+            }
+        }
+    }
+}
+
+// Function to handle SQLite-specific processing with random probability
+void processSQLite(QueryInfo& query_info) {
+    srand(time(NULL));  // Initialize the random seed
+
+    for (auto& query : query_info.queries) {
+        std::stringstream ss(query);
+        std::string statement;
+        std::string new_query;
+
+        addPragmaCommands(query_info, new_query);
+
+        // Process each SQL statement (e.g., CREATE TABLE, INSERT, SELECT)
+        bool modified = false;
+        while (std::getline(ss, statement, ';')) {
+            // Trim leading/trailing spaces
+            statement.erase(0, statement.find_first_not_of(" \t\n\r"));
+            statement.erase(statement.find_last_not_of(" \t\n\r") + 1);
+
+            // Process CREATE TABLE statements
+            size_t create_pos = statement.find("CREATE TABLE");
+            if (create_pos != std::string::npos) {
+                size_t pk_pos = statement.find("PRIMARY KEY", create_pos);
+
+                if (pk_pos != std::string::npos) {
+                    // Check if "WITHOUT ROWID" is already present
+                    if (statement.find("WITHOUT ROWID") == std::string::npos) {
+                        // Randomly decide whether to apply WITHOUT ROWID (e.g., 50% chance)
+                        if (rand() % 100 < 30) {  // 30% chance to add WITHOUT ROWID
+                            statement += " WITHOUT ROWID";
+                            modified = true;
+                            // Set the appropriate flag in type2_scenario
+                            query_info.type2_scenario |= DIFF2_SQLite_WITHOUT_ROWID;
+                        }
+                    }
+                }
+            }
+
+            // Rebuild the query with modified statements
+            if (!statement.empty()) {
+                new_query += statement + "; ";
+            }
+        }
+
+        // If modified, update the original query with the modified query
+        if (modified) {
+            query = new_query;
+        } else {
+            query = new_query;  // Apply new query regardless of modification
+        }
+    }
+}
+
+// Function to handle MySQL-specific processing with random application and UNIQUE check
+void processMySQL(QueryInfo& query_info) {
+    srand(time(NULL));  // Initialize the random seed
+
+    for (auto& query : query_info.queries) {
+        std::stringstream ss(query);
+        std::string statement;
+        std::string new_query;
+        bool modified = false;
+
+        // Process each SQL statement (e.g., CREATE INDEX, ALTER INDEX, INSERT, SELECT)
+        while (std::getline(ss, statement, ';')) {
+            // Trim leading/trailing spaces
+            statement.erase(0, statement.find_first_not_of(" \t\n\r"));
+            statement.erase(statement.find_last_not_of(" \t\n\r") + 1);
+
+            // Handle CREATE INDEX for MySQL with a 50% chance, but skip if UNIQUE
+            size_t create_index_pos = statement.find("CREATE INDEX");
+            if (create_index_pos != std::string::npos) {
+                // Check if the index is UNIQUE
+                size_t unique_pos = statement.find("UNIQUE", create_index_pos);
+                if (unique_pos == std::string::npos) {  // Only proceed if the index is NOT UNIQUE
+                    // Randomly decide whether to apply INVISIBLE (50% chance)
+                    if (rand() % 100 < 50) {
+                        // Check if "INVISIBLE" is already present
+                        if (statement.find("INVISIBLE") == std::string::npos) {
+                            // Add INVISIBLE at the end of the CREATE INDEX statement
+                            statement += " INVISIBLE";
+                            modified = true;
+                            query_info.type2_scenario |= DIFF2_MYSQL_CREATE_INVISIBLE_INDEX;
+                        }
+                    }
+                }
+            }
+
+            // Handle ALTER INDEX for MySQL with a 30% chance
+            size_t alter_index_pos = statement.find("ALTER INDEX");
+            if (alter_index_pos != std::string::npos) {
+                // Randomly decide whether to apply INVISIBLE (30% chance)
+                if (rand() % 100 < 30) {
+                    // Check if "INVISIBLE" is already present
+                    if (statement.find("INVISIBLE") == std::string::npos) {
+                        // Add INVISIBLE at the end of the ALTER INDEX statement
+                        statement += " INVISIBLE";
+                        modified = true;
+                        query_info.type2_scenario |= DIFF2_MYSQL_ALTER_INVISIBLE_INDEX;
+                    }
+                }
+            }
+
+            // Rebuild the query with modified statements
+            if (!statement.empty()) {
+                new_query += statement + "; ";
+            }
+        }
+
+        // Update the original query with the modified query if modified
+        if (modified) {
+            query = new_query;
+        }
+    }
+}
+
+// Function to handle PostgreSQL-specific processing
+void processPostgreSQL(QueryInfo& query_info) {
+    // Add PostgreSQL specific logic here
+}
+
+// Function to handle Oracle-specific processing with random application and UNIQUE check
+void processOracle(QueryInfo& query_info) {
+    srand(time(NULL));  // Initialize the random seed
+
+    for (auto& query : query_info.queries) {
+        std::stringstream ss(query);
+        std::string statement;
+        std::string new_query;
+        bool modified = false;
+
+        // Process each SQL statement (e.g., CREATE INDEX, ALTER INDEX, INSERT, SELECT)
+        while (std::getline(ss, statement, ';')) {
+            // Trim leading/trailing spaces
+            statement.erase(0, statement.find_first_not_of(" \t\n\r"));
+            statement.erase(statement.find_last_not_of(" \t\n\r") + 1);
+
+            // Handle CREATE INDEX for Oracle with a 50% chance, but skip if UNIQUE
+            size_t create_index_pos = statement.find("CREATE INDEX");
+            if (create_index_pos != std::string::npos) {
+                // Check if the index is UNIQUE
+                size_t unique_pos = statement.find("UNIQUE", create_index_pos);
+                if (unique_pos == std::string::npos) {  // Only proceed if the index is NOT UNIQUE
+                    // Randomly decide whether to apply INVISIBLE (50% chance)
+                    if (rand() % 100 < 50) {
+                        // Check if "INVISIBLE" is already present
+                        if (statement.find("INVISIBLE") == std::string::npos) {
+                            // Add INVISIBLE at the end of the CREATE INDEX statement
+                            statement += " INVISIBLE";
+                            modified = true;
+                            query_info.type2_scenario |= DIFF2_ORACLE_CREATE_INVISIBLE_INDEX;
+                        }
+                    }
+                }
+            }
+
+            // Handle ALTER INDEX for Oracle with a 30% chance
+            size_t alter_index_pos = statement.find("ALTER INDEX");
+            if (alter_index_pos != std::string::npos) {
+                // Randomly decide whether to apply INVISIBLE (30% chance)
+                if (rand() % 100 < 30) {
+                    // Check if "INVISIBLE" is already present
+                    if (statement.find("INVISIBLE") == std::string::npos) {
+                        // Add INVISIBLE at the end of the ALTER INDEX statement
+                        statement += " INVISIBLE";
+                        modified = true;
+                        query_info.type2_scenario |= DIFF2_ORACLE_ALTER_INVISIBLE_INDEX;
+                    }
+                }
+            }
+
+            // Rebuild the query with modified statements
+            if (!statement.empty()) {
+                new_query += statement + "; ";
+            }
+        }
+
+        // Update the original query with the modified query if modified
+        if (modified) {
+            query = new_query;
+        }
+    }
+}
+
+// mutation 전 : old_plan
+// 현재 실행 중(mutation 후 transpiled plan) : plan
+// Main postprocess function that routes to DBMS-specific handlers
+void postprocess(OraclePlan *plan) {
+    for (auto& query_info_pair : plan->query_infos) {
+        Target dbms_target = query_info_pair.first;
+        QueryInfo& query_info = query_info_pair.second;
+
+        switch (dbms_target) {
+            case Target::SQLite:
+                processSQLite(query_info);
+                break;
+            case Target::MySQL:
+                processMySQL(query_info);
+                break;
+            case Target::PostgreSQL:
+                processPostgreSQL(query_info);
+                break;
+            case Target::Oracle:
+                processOracle(query_info);
+                break;
+            default:
+                std::cerr << "Unsupported DBMS target encountered: " << target_to_string(dbms_target) << ".\n";
+                break;
+        }
+    }
+}
+
+/*
 void postprocess(OraclePlan *plan, OraclePlan *old_plan) {
   // Perform operations on the plan, perhaps modifying it based on old_plan or
   // other logic
@@ -760,3 +1216,4 @@ void postprocess(OraclePlan *plan, OraclePlan *old_plan) {
 
   // Additional post-processing steps can be added here based on your needs
 }
+*/
