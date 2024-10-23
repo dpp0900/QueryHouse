@@ -640,6 +640,7 @@ bool execute_plan(
 
   return true;
 }
+
 /* memo:
  *
  * void foo(const vector<unique_ptr<client::DBClient>>& db_clients) {

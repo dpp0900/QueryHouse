@@ -125,7 +125,15 @@ using OracleType = uint8_t;
 using DiffTestMask = uint32_t;
 
 #define DIFF2_NONE 0
-#define DIFF2_SQLite_WITHOUT_ROWID 1
+
+#define DIFF2_SQLITE_PRAGMA 1
+#define DIFF2_SQLite_WITHOUT_ROWID  2
+
+#define DIFF2_MYSQL_CREATE_INVISIBLE_INDEX 1
+#define DIFF2_MYSQL_ALTER_INVISIBLE_INDEX 2
+
+#define DIFF2_ORACLE_CREATE_INVISIBLE_INDEX 1
+#define DIFF2_ORACLE_ALTER_INVISIBLE_INDEX 2
 // ...
 
 /*
@@ -212,7 +220,18 @@ OraclePlan *oracle_planner(const std::string src_query,
  *
  * It can refer to the plan of the original seed `old_plan` as hints.
  */
-void postprocess(OraclePlan *plan, OraclePlan *old_plan);  // TODO
+
+void addPragmaCommands(QueryInfo& query_info, std::string& new_query);
+
+void processSQLite(QueryInfo& query_info);
+
+void processMySQL(QueryInfo& query_info);
+
+void processPostgreSQL(QueryInfo& query_insfo);
+
+void processOracle(QueryInfo& query_info);
+
+void postprocess(OraclePlan *plan);
 
 /***************************************
  * Round
