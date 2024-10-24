@@ -19,14 +19,14 @@ void SQLiteClient::prepare_env() {
   ++database_id_;
   std::string db_name = db_prefix_ + std::to_string(database_id_) + ".db";
   db_path_ = db_name;
-  std::cout << "[SQLite] Prepared environment with DB: " << db_path_
-            << std::endl;
+  sqlite_logfile << "[SQLite] Prepared environment with DB: " << db_path_
+                 << std::endl;
 }
 
 ExecutionStatus SQLiteClient::execute(
     const char *query, size_t size,
     std::vector<std::vector<std::string>> &result) {
-  std::cout << "[SQLite] Executing queries..." << std::endl;
+  sqlite_logfile << "[SQLite] Executing queries..." << std::endl;
   // sqlite_logfile << "[SQLite] Executing queries..." << std::endl;
   // sqlite_logfile << query << std::endl;
 
@@ -37,22 +37,22 @@ ExecutionStatus SQLiteClient::execute(
   // 데이터베이스 연결 생성
   if (auto conn = create_connection(); conn) {
     db = *conn;
-    std::cout << "[SQLite] Connected to SQLite database" << std::endl;
+    sqlite_logfile << "[SQLite] Connected to SQLite database" << std::endl;
   } else {
-    std::cout << "Failed to connect to SQLite database" << std::endl;
+    sqlite_logfile << "Failed to connect to SQLite database" << std::endl;
     return kServerCrash;
   }
 
   // 각 쿼리를 처리
   for (const auto &q : queries) {
-    std::cout << "[SQLite] Execute query: " << q << std::endl;
+    sqlite_logfile << "[SQLite] Execute query: " << q << std::endl;
 
     sqlite3_stmt *stmt = nullptr;
     int result_code = sqlite3_prepare_v2(db, q.c_str(), -1, &stmt, nullptr);
 
     if (result_code != SQLITE_OK) {
-      std::cout << "SQLite error preparing statement: " << sqlite3_errmsg(db)
-                << std::endl;
+      sqlite_logfile << "SQLite error preparing statement: "
+                     << sqlite3_errmsg(db) << std::endl;
       close_connection(db);
       return kSyntaxError;
     }
@@ -72,8 +72,8 @@ ExecutionStatus SQLiteClient::execute(
       } else if (result_code == SQLITE_DONE) {
         break;  // 쿼리 완료
       } else {
-        std::cout << "SQLite error executing step: " << sqlite3_errmsg(db)
-                  << std::endl;
+        sqlite_logfile << "SQLite error executing step: " << sqlite3_errmsg(db)
+                       << std::endl;
         sqlite3_finalize(stmt);
         close_connection(db);
         return kExecuteError;
@@ -96,7 +96,7 @@ ExecutionStatus SQLiteClient::execute(
     }
   }
   // 스키마 정보 가져오기
-  std::cout << "[SQLite] Retrieving schema information..." << std::endl;
+  sqlite_logfile << "[SQLite] Retrieving schema information..." << std::endl;
   const char *schema_query =
       "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE "
       "type='table';";
@@ -105,8 +105,8 @@ ExecutionStatus SQLiteClient::execute(
       sqlite3_prepare_v2(db, schema_query, -1, &schema_stmt, nullptr);
 
   if (schema_result != SQLITE_OK) {
-    std::cout << "SQLite error retrieving schema: " << sqlite3_errmsg(db)
-              << std::endl;
+    sqlite_logfile << "SQLite error retrieving schema: " << sqlite3_errmsg(db)
+                   << std::endl;
     close_connection(db);
     return kSyntaxError;
   }
@@ -122,10 +122,10 @@ ExecutionStatus SQLiteClient::execute(
     const char *sql =
         reinterpret_cast<const char *>(sqlite3_column_text(schema_stmt, 3));
 
-    std::cout << "Type: " << (type ? type : "NULL")
-              << ", Name: " << (name ? name : "NULL")
-              << ", Table: " << (tbl_name ? tbl_name : "NULL")
-              << ", SQL: " << (sql ? sql : "NULL") << std::endl;
+    sqlite_logfile << "Type: " << (type ? type : "NULL")
+                   << ", Name: " << (name ? name : "NULL")
+                   << ", Table: " << (tbl_name ? tbl_name : "NULL")
+                   << ", SQL: " << (sql ? sql : "NULL") << std::endl;
   }
 
   // 스키마 명령문 해제
@@ -139,9 +139,9 @@ ExecutionStatus SQLiteClient::execute(
 void SQLiteClient::clean_up_env() {
   std::string db_name = db_prefix_ + std::to_string(database_id_) + ".db";
   if (remove(db_name.c_str()) != 0) {
-    std::cout << "Error deleting database file: " << db_name << std::endl;
+    sqlite_logfile << "Error deleting database file: " << db_name << std::endl;
   } else {
-    std::cout << "[SQLite] Deleted database: " << db_name << std::endl;
+    sqlite_logfile << "[SQLite] Deleted database: " << db_name << std::endl;
   }
 }
 
@@ -155,11 +155,11 @@ bool SQLiteClient::check_alive() {
 
 std::optional<sqlite3 *> SQLiteClient::create_connection() {
   sqlite3 *db = nullptr;
-  std::cout << "[SQLite] Connecting to SQLite database: " << db_path_
-            << std::endl;
+  sqlite_logfile << "[SQLite] Connecting to SQLite database: " << db_path_
+                 << std::endl;
   if (sqlite3_open(db_path_.c_str(), &db) != SQLITE_OK) {
-    std::cout << "Failed to open SQLite database: " << sqlite3_errmsg(db)
-              << std::endl;
+    sqlite_logfile << "Failed to open SQLite database: " << sqlite3_errmsg(db)
+                   << std::endl;
     return std::nullopt;
   }
   return db;
