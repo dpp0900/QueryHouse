@@ -800,9 +800,19 @@ size_t findOppositeParentheses(const std::string &query, int start) {
   return -1;
 }
 
+std::string strip(const std::string &str) {
+  std::string result;
+  for (const auto &c : str) {
+    if (c != ' ' && c != '\n' && c != '\t') {
+      result.push_back(c);
+    }
+  }
+  return result;
+}
+
 bool createInfo(const std::string &query, std::string &tablename,
                 std::vector<std::pair<std::string, std::string>> &columnnames) {
-  std::string create = "CREATE TABLE";
+  std::string create = "CREATE TABLE ";
   size_t create_pos = query.find(create);
   if (create_pos == std::string::npos) {
     return false;
@@ -844,38 +854,154 @@ bool createInfo(const std::string &query, std::string &tablename,
   return true;
 }
 
+bool indexInfo(const std::string &query, std::string &tablename,
+               std::vector<std::string> &columnnames) {
+  std::string prefix = "CREATE INDEX";
+  size_t on_pos = query.find(prefix);
+  if (on_pos == std::string::npos) {
+    return false;
+  }
+  prefix = " ON ";
+  size_t start = query.find(prefix, on_pos) + prefix.size();
+  size_t end = query.find('(', start);
+  tablename = query.substr(start, end - start);
+  size_t column_start = end;
+  size_t column_end = findOppositeParentheses(query, column_start);
+  std::string columnsblock =
+      query.substr(column_start + 1, column_end - column_start - 1);
+  // seprate comma
+  std::string column;
+  std::vector<std::string> columns;
+  for (size_t i = 0; i < columnsblock.size(); i++) {
+    if (columnsblock[i] == ',') {
+      columns.push_back(column);
+      column.clear();
+    } else {
+      column.push_back(columnsblock[i]);
+    }
+  }
+  columns.push_back(column);
+  for (const auto &col : columns) {
+    std::istringstream col_stream(col);
+    std::string colname;
+    col_stream >> colname;
+    columnnames.push_back(colname);
+  }
+  return true;
+}
+
 void mysqlIndexSize_Postprocess(OraclePlan *plan) {
-  std::ofstream postprocesslog("/tmp/tmpPostprocess",
-                               std::ios::out | std::ios::app);
-  // disable flush
-  postprocesslog << std::unitbuf;
+  // std::ofstream postprocesslog("/tmp/tmpPostprocess",
+  //                              std::ios::out | std::ios::app);
+  // postprocesslog << std::unitbuf;
   int mysql_index_size = plan->query_infos.at(Target::MySQL).queries.size();
-  postprocesslog << "MySQL index size: " << mysql_index_size << std::endl;
   for (int i = 0; i < mysql_index_size; i++) {
     std::string query = plan->query_infos.at(Target::MySQL).queries[i];
-    postprocesslog << "Query: " << query << std::endl;
     std::vector<std::string> queries = splitQuery(query);
     // find create
-    std::string tablename;
-    std::vector<std::pair<std::string, std::string>> columnnames;
-    for (const auto &q : queries) {
-      if (createInfo(q, tablename, columnnames)) {
-        postprocesslog << "Create: " << tablename << std::endl;
-        for (const auto &col : columnnames) {
-          postprocesslog << "  " << col.first << " " << col.second << std::endl;
+    std::vector<std::string> create_tablename_vector;
+    std::vector<std::vector<std::pair<std::string, std::string>>>
+        create_columnname_vectors;
+    std::vector<size_t> create_pos_vector;
+
+    std::string create_tablename;
+    std::vector<std::pair<std::string, std::string>> create_columnnames;
+    for (size_t j = 0; j < queries.size(); j++) {
+      if (createInfo(queries[j], create_tablename, create_columnnames)) {
+        create_tablename_vector.push_back(create_tablename);
+        create_columnname_vectors.push_back(create_columnnames);
+        create_pos_vector.push_back(j);
+        create_tablename.clear();
+        create_columnnames.clear();
+      }
+    }
+    if (create_tablename_vector.empty()) {
+      continue;
+    }
+    // postprocesslog << "======" << std::endl;
+    // postprocesslog << "query: " << query << std::endl;
+    for (size_t j = 0; j < create_tablename_vector.size(); j++) {
+      // postprocesslog << "create tablename: " << create_tablename_vector[j]
+      //                << std::endl;
+      for (const auto &col : create_columnname_vectors[j]) {
+        // postprocesslog << "column name: " << col.first
+        //                << " column type: " << col.second << std::endl;
+      }
+    }
+
+    // find index
+    std::vector<std::string> index_tablename_vector;
+    std::vector<std::vector<std::string>> index_columnname_vectors;
+    std::vector<size_t> index_pos_vector;
+    for (size_t j = 0; j < queries.size(); j++) {
+      std::string index_tablename;
+      std::vector<std::string> index_columnnames;
+      if (indexInfo(queries[j], index_tablename, index_columnnames)) {
+        index_tablename_vector.push_back(index_tablename);
+        index_columnname_vectors.push_back(index_columnnames);
+        index_pos_vector.push_back(j);
+        index_tablename.clear();
+        index_columnnames.clear();
+      }
+    }
+    if (index_tablename_vector.empty()) {
+      continue;
+    }
+    for (size_t j = 0; j < index_tablename_vector.size(); j++) {
+      // check create tablename
+      for (size_t k = 0; k < create_tablename_vector.size(); k++) {
+        // postprocesslog << "Comparing " << create_tablename_vector[k] << " and
+        // "
+        //                << index_tablename_vector[j] << std::endl;
+        if (strip(create_tablename_vector[k]) ==
+                strip(index_tablename_vector[j]) &&
+            create_pos_vector[k] < index_pos_vector[j]) {
+          // check column name is same and type is TEXT or VARCHAR(*)
+          for (const auto &col : create_columnname_vectors[k]) {
+            for (const auto &index_col : index_columnname_vectors[j]) {
+              if (strip(col.first) == strip(index_col) &&
+                  (col.second == "TEXT" ||
+                   col.second.find("VARCHAR") != std::string::npos)) {
+                // replace index column into v0(766)
+                std::string original_query = queries[index_pos_vector[j]];
+                queries[index_pos_vector[j]] =
+                    queries[index_pos_vector[j]].replace(
+                        queries[index_pos_vector[j]].find(index_col),
+                        index_col.size(), col.first + "(766)");
+                plan->query_infos.at(Target::MySQL)
+                    .queries[i]
+                    .replace(plan->query_infos.at(Target::MySQL)
+                                 .queries[i]
+                                 .find(original_query),
+                             original_query.size(),
+                             queries[index_pos_vector[j]]);
+              }
+            }
+          }
         }
       }
     }
+    // postprocesslog << "Final query: "
+    //                << plan->query_infos.at(Target::MySQL).queries[i]
+    //                << std::endl;
   }
 }
 
 void postprocess(OraclePlan *plan, OraclePlan *old_plan) {
-  // Perform operations on the plan, perhaps modifying it based on old_plan
-  // or other logic
+  // modify plan's query for debug
+  // plan->query_infos.at(Target::MySQL).queries[0] =
+  //     "CREATE TABLE t0 (c0 TEXT);CREATE TABLE t1 (c0 INT, c1 "
+  //     "VARCHAR(1010)); "
+  //     "CREATE INDEX i0 ON t0 ( c0 );";
+  // Perform operations on the plan, perhaps modifying it based on
+  // old_plan or other logic
   if (old_plan) {
-    // Example: If old_plan exists, copy some data from old_plan to plan
-    // plan->oracle_plan = old_plan->oracle_plan;  // Just an example action
+    // Example: If old_plan exists, copy some data from old_plan to
+    // plan plan->oracle_plan = old_plan->oracle_plan;  // Just an
+    // example action
   }
   mysqlIndexSize_Postprocess(plan);
-  // Additional post-processing steps can be added here based on your needs
+
+  // Additional post-processing steps can be added here based on
+  // your needs
 }
