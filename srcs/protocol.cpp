@@ -771,13 +771,111 @@ void report(OraclePlan &plan, uint8_t position, std::vector<Result> &results) {
 
   logfile << "    Position in query: " << static_cast<int>(position) << "\n\n";
 }
+
+// split query with semicolon
+std::vector<std::string> splitQuery(const std::string &query) {
+  std::vector<std::string> queries;
+  std::string query_piece;
+  std::istringstream query_stream(query);
+  while (std::getline(query_stream, query_piece, ';')) {
+    if (!query_piece.empty()) {
+      queries.push_back(query_piece);
+    }
+  }
+  return queries;
+}
+
+size_t findOppositeParentheses(const std::string &query, int start) {
+  int count = 0;
+  for (size_t i = start; i < query.size(); i++) {
+    if (query[i] == '(') {
+      count++;
+    } else if (query[i] == ')') {
+      count--;
+    }
+    if (count == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+bool createInfo(const std::string &query, std::string &tablename,
+                std::vector<std::pair<std::string, std::string>> &columnnames) {
+  std::string create = "CREATE TABLE";
+  size_t create_pos = query.find(create);
+  if (create_pos == std::string::npos) {
+    return false;
+  }
+  size_t start = create_pos + create.size();
+  size_t end = query.find('(', start);
+  tablename = query.substr(start, end - start);
+  size_t column_start = end;
+  size_t column_end = findOppositeParentheses(query, column_start);
+  std::string columnsblock =
+      query.substr(column_start + 1, column_end - column_start - 1);
+
+  // seprate parenthesis
+  std::vector<std::string> columns;
+  std::string column;
+  for (size_t i = 0; i < columnsblock.size(); i++) {
+    if (columnsblock[i] == ' ' && columnsblock[i + 1] == '(') {
+      i = findOppositeParentheses(columnsblock, i + 1) + 1;
+    }
+    if (columnsblock[i] == ',') {
+      columns.push_back(column);
+      column.clear();
+    } else {
+      column.push_back(columnsblock[i]);
+    }
+  }
+  columns.push_back(column);
+  for (const auto &col : columns) {
+    std::istringstream col_stream(col);
+    std::string colname;
+    std::string coltype;
+    col_stream >> colname >> coltype;
+    // find ( in coltype and add until )
+    if (coltype.find('(') != std::string::npos) {
+      col_stream >> coltype;
+    }
+    columnnames.push_back({colname, coltype});
+  }
+  return true;
+}
+
+void mysqlIndexSize_Postprocess(OraclePlan *plan) {
+  std::ofstream postprocesslog("/tmp/tmpPostprocess",
+                               std::ios::out | std::ios::app);
+  // disable flush
+  postprocesslog << std::unitbuf;
+  int mysql_index_size = plan->query_infos.at(Target::MySQL).queries.size();
+  postprocesslog << "MySQL index size: " << mysql_index_size << std::endl;
+  for (int i = 0; i < mysql_index_size; i++) {
+    std::string query = plan->query_infos.at(Target::MySQL).queries[i];
+    postprocesslog << "Query: " << query << std::endl;
+    std::vector<std::string> queries = splitQuery(query);
+    // find create
+    std::string tablename;
+    std::vector<std::pair<std::string, std::string>> columnnames;
+    for (const auto &q : queries) {
+      if (createInfo(q, tablename, columnnames)) {
+        postprocesslog << "Create: " << tablename << std::endl;
+        for (const auto &col : columnnames) {
+          postprocesslog << "  " << col.first << " " << col.second << std::endl;
+        }
+      }
+    }
+  }
+}
+
 void postprocess(OraclePlan *plan, OraclePlan *old_plan) {
-  // Perform operations on the plan, perhaps modifying it based on old_plan or
-  // other logic
+  // Perform operations on the plan, perhaps modifying it based on old_plan
+  // or other logic
   if (old_plan) {
     // Example: If old_plan exists, copy some data from old_plan to plan
     // plan->oracle_plan = old_plan->oracle_plan;  // Just an example action
   }
-
+  mysqlIndexSize_Postprocess(plan);
   // Additional post-processing steps can be added here based on your needs
 }
