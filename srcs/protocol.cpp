@@ -335,14 +335,9 @@ std::string trimQuotes(const std::string &str) {
 // Function to format a float string into a fixed-length string with leading
 // zeros
 std::string formatFloat(const std::string &floatStr) {
-  size_t int_length = floatStr.find('.');
-  size_t float_length = floatStr.length() - 1 - int_length;
-
-  std::string res;
-  for (size_t i = 0; i < PREPENDING_ZEROS - int_length; i++) res += "0";
-  res += floatStr;
-  for (size_t i = 0; i < TRAILING_ZEROS - float_length; i++) res += "0";
-
+  std::string res = floatStr;
+  float f = std::stof(floatStr);
+  res = std::to_string(f);
   return res;
 }
 
@@ -354,6 +349,7 @@ std::vector<std::vector<std::string>> normalizeValues(
   std::map<std::string, std::string> replace_map = {
       {"t", "1"},
       {"f", "0"},
+      {"NULL", ""},
   };
 
   auto normalized_result = result;
@@ -371,7 +367,10 @@ std::vector<std::vector<std::string>> normalizeValues(
         }
       }
       if (isFloat(cell)) {
+        outfile << CYAN << "Formatting float: " << cell;
         cell = formatFloat(cell);  // Format floats to a standard representation
+        outfile << " -> " << cell << RESET << std::endl;
+
       } else {
         cell = trimQuotes(cell);  // Remove quotes before comparison
       }

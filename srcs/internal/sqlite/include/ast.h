@@ -1,15 +1,14 @@
 #ifndef __AST_H__
 #define __AST_H__
 
+#include <algorithm>  // std::find
 #include <iostream>
 #include <map>
 #include <set>
+#include <stdexcept>  // std::runtime_error
 #include <string>
-#include <vector>
 #include <unordered_map>
-#include <string>
-#include <algorithm>   // std::find
-#include <stdexcept>   // std::runtime_error
+#include <vector>
 
 #include "define.h"
 
@@ -17,8 +16,8 @@ using namespace std;
 
 /* add k */
 struct TableInfo {
-    std::vector<std::string> columns;  // List of columns
-    std::string primary_key;           // Primary key column
+  std::vector<std::string> columns;  // List of columns
+  std::string primary_key;           // Primary key column
 };
 
 /* end k */
@@ -89,24 +88,18 @@ class IROperator {
 
 class IR {
  public:
-    std::string name;
-    std::vector<std::string> column_names;
-    std::string primary_key;
+  std::string name;
+  std::vector<std::string> column_names;
+  std::string primary_key;
 
-    // 테이블의 컬럼 이름들을 반환하는 함수
-    std::vector<std::string> get_column_names() {
-        return column_names;
-    }
+  // 테이블의 컬럼 이름들을 반환하는 함수
+  std::vector<std::string> get_column_names() { return column_names; }
 
-    // Primary Key를 반환하는 함수
-    std::string get_primary_key() {
-        return primary_key;
-    }
+  // Primary Key를 반환하는 함수
+  std::string get_primary_key() { return primary_key; }
 
-    // 객체의 이름을 반환하는 함수
-    std::string get_name() {
-        return name;
-    }
+  // 객체의 이름을 반환하는 함수
+  std::string get_name() { return name; }
   IR(IRTYPE type, IROperator* op, IR* left = NULL, IR* right = NULL)
       : type_(type),
         op_(op),
@@ -1108,8 +1101,6 @@ class ColumnArglist : public Node {
   vector<ColumnArg*> v_column_arg_;
 };
 
-
-
 class ColumnArg : public Node {
  public:
   virtual void deep_delete();
@@ -1584,17 +1575,17 @@ class CollationName : public Node {
 };
 
 class ColumnInParen : public Node {
-  public:
-   virtual void deep_delete();
-   virtual IR* translate(vector<IR*>& v_ir_collector);
-   ColumnName* column_name_;
+ public:
+  virtual void deep_delete();
+  virtual IR* translate(vector<IR*>& v_ir_collector);
+  ColumnName* column_name_;
 };
 
-class opt_ForeignKeylist : public Node {
-    public:
-   virtual void deep_delete();
-   virtual IR* translate(vector<IR*>& v_ir_collector);
-   ForeignKeylist* ForeignKeylist_;
+class opt_ForeignKeylist : public Opt {
+ public:
+  virtual void deep_delete();
+  virtual IR* translate(vector<IR*>& v_ir_collector);
+  ForeignKeylist* ForeignKeylist_;
 };
 
 class ForeignKeylist : public Node {
@@ -1619,7 +1610,7 @@ class ForeignKeyColumn : public Node {
   ColumnInParen* column_name_;
 };
 
-class FkNoOptstmt: public Node {
+class FkNoOptstmt : public Node {
  public:
   virtual void deep_delete();
   virtual IR* translate(vector<IR*>& v_ir_collector);
@@ -1628,18 +1619,18 @@ class FkNoOptstmt: public Node {
 };
 
 class ForeignKeyRef : public Node {
-   public:
+ public:
   virtual void deep_delete();
   virtual IR* translate(vector<IR*>& v_ir_collector);
   TableName* table_name_;
   ColumnInParen* column_name_;
 };
 
-class opt_Actiontypelist : public Node {
-    public:
-   virtual void deep_delete();
-   virtual IR* translate(vector<IR*>& v_ir_collector);
-   Action_typelist* Action_typelist_;
+class opt_Actiontypelist : public Opt {
+ public:
+  virtual void deep_delete();
+  virtual IR* translate(vector<IR*>& v_ir_collector);
+  Action_typelist* Action_typelist_;
 };
 
 class Action_typelist : public Node {
@@ -1650,17 +1641,17 @@ class Action_typelist : public Node {
 };
 
 class Action_type : public Node {
-  public:
-   virtual void deep_delete();
-   virtual IR* translate(vector<IR*>& v_ir_collector);
-   string str_val_;
+ public:
+  virtual void deep_delete();
+  virtual IR* translate(vector<IR*>& v_ir_collector);
+  string str_val_;
 };
 
 class CreateInparan : public Node {
-  public:
-   virtual void deep_delete();
-   virtual IR* translate(vector<IR*>& v_ir_collector);
-   ColumnDefCommaList* column_def_commalist_;
-   opt_ForeignKeylist* opt_ForeignKeylist_;
+ public:
+  virtual void deep_delete();
+  virtual IR* translate(vector<IR*>& v_ir_collector);
+  ColumnDefCommaList* column_def_commalist_;
+  opt_ForeignKeylist* opt_ForeignKeylist_;
 };
 #endif

@@ -91,11 +91,14 @@ ExecutionStatus MySQLClient::execute(
       int num_fields = mysql_num_fields(query_result);
       MYSQL_ROW row;
       while ((row = mysql_fetch_row(query_result))) {
+        mysql_logfile << "[MySQL] Result: ";
         std::vector<std::string> row_result;
         for (int i = 0; i < num_fields; ++i) {
           row_result.push_back(row[i] ? row[i] : "NULL");
+          mysql_logfile << row_result.back() << " ";
         }
         result.push_back(row_result);
+        mysql_logfile << std::endl;
       }
       mysql_free_result(query_result);
     }
