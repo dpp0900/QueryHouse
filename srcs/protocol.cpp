@@ -776,21 +776,11 @@ void addPragmaCommands(QueryInfo& query_info, std::string& new_query) {
         if (rand() % 100 < 15) {
             bool enable_automatic_index = rand() % 2 == 0;  // Randomly enable or disable
             new_query += "PRAGMA automatic_index = " + std::string(enable_automatic_index ? "true" : "false") + "; ";
-            s
             if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
                 query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
             }
         }
-
-        if (rand() % 100 < 15) {
-            int busy_timeout = rand() % 5000 + 1000;  // Random timeout between 1000 and 5000 milliseconds
-            new_query += "PRAGMA busy_timeout = " + std::to_string(busy_timeout) + "; ";
-            
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
+        
         if (rand() % 100 < 15) {
             int cache_size = (rand() % 1000) - 500;  // Random cache size between -500 and 500 (negative for kibibytes)
             new_query += "PRAGMA cache_size = " + std::to_string(cache_size) + "; ";
@@ -824,15 +814,6 @@ void addPragmaCommands(QueryInfo& query_info, std::string& new_query) {
         }
 
         if (rand() % 100 < 15) {
-            bool count_changes = rand() % 2 == 0;
-            new_query += "PRAGMA count_changes = " + std::string(count_changes ? "true" : "false") + "; ";
-
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
-        if (rand() % 100 < 15) {
             int default_cache_size = rand() % 1000 + 1;  // Random default cache size between 1 and 1000 pages
             new_query += "PRAGMA default_cache_size = " + std::to_string(default_cache_size) + "; ";
 
@@ -845,44 +826,6 @@ void addPragmaCommands(QueryInfo& query_info, std::string& new_query) {
             int encoding_choice = rand() % 4; 
             std::string encoding = (encoding_choice == 0) ? "'UTF-8'" : (encoding_choice == 1) ? "'UTF-16'" : (encoding_choice == 2) ? "'UTF-16le'" : "'UTF-16be'";
             new_query += "PRAGMA encoding = " + encoding + "; ";
-
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
-        if (rand() % 100 < 15) {
-            std::string journal_modes[] = { "DELETE", "TRUNCATE", "PERSIST", "MEMORY", "WAL", "OFF" };
-            std::string selected_journal_mode = journal_modes[rand() % 6];  // Randomly choose one mode
-            new_query += "PRAGMA journal_mode = " + selected_journal_mode + "; ";
-
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
-        if (rand() % 100 < 15) {
-            int journal_size_limit = rand() % 10000 + 1000;  // Random journal size limit between 1000 and 10000 bytes
-            new_query += "PRAGMA journal_size_limit = " + std::to_string(journal_size_limit) + "; ";
-
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
-        if (rand() % 100 < 15) {
-            std::string locking_modes[] = { "NORMAL", "EXCLUSIVE" };
-            std::string selected_locking_mode = locking_modes[rand() % 2];  // Randomly choose one mode
-            new_query += "PRAGMA locking_mode = " + selected_locking_mode + "; ";
-
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
-        if (rand() % 100 < 15) {
-            int max_page_count = rand() % 10000 + 1000;  // Random max page count between 1000 and 10000 pages
-            new_query += "PRAGMA max_page_count = " + std::to_string(max_page_count) + "; ";
 
             if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
                 query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
@@ -925,25 +868,6 @@ void addPragmaCommands(QueryInfo& query_info, std::string& new_query) {
             }
         }
 
-        if (rand() % 100 < 15) {
-            std::string secure_delete_modes[] = { "false", "true", "FAST" };
-            std::string selected_secure_delete = secure_delete_modes[rand() % 3];  // Randomly choose between OFF, ON, FAST
-            new_query += "PRAGMA secure_delete = " + selected_secure_delete + "; ";
-
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
-        if (rand() % 100 < 15) {
-            int soft_heap_limit = rand() % 100000 + 10000;  // Random soft heap limit between 10000 and 100000 bytes
-            new_query += "PRAGMA soft_heap_limit = " + std::to_string(soft_heap_limit) + "; ";
-
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
         if (rand() % 100 < 15) {  
             int synchronous_modes[] = { 0, 1, 2, 3 };
             int selected_synchronous_mode = synchronous_modes[rand() % 4];  // Randomly choose one mode
@@ -967,26 +891,8 @@ void addPragmaCommands(QueryInfo& query_info, std::string& new_query) {
         }
 
         if (rand() % 100 < 15) { 
-            int max_threads = rand() % 16 + 1;  // Random number of threads between 1 and 16
-            new_query += "PRAGMA threads = " + std::to_string(max_threads) + "; ";
-
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
-        if (rand() % 100 < 15) { 
-            int wal_autocheckpoint = rand() % 1000 + 1;  // Random WAL autocheckpoint value between 1 and 1000 pages
-            new_query += "PRAGMA wal_autocheckpoint = " + std::to_string(wal_autocheckpoint) + "; ";
-
-            if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
-                query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
-            }
-        }
-
-        if (rand() % 100 < 15) { 
             new_query += "PRAGMA optimize; ";
-
+            
             if (!(query_info.type2_scenario & DIFF2_SQLITE_PRAGMA)){
                 query_info.type2_scenario |= DIFF2_SQLITE_PRAGMA;
             }
@@ -1180,7 +1086,12 @@ void processOracle(QueryInfo& query_info) {
 // mutation 전 : old_plan
 // 현재 실행 중(mutation 후 transpiled plan) : plan
 // Main postprocess function that routes to DBMS-specific handlers
-void postprocess(OraclePlan *plan) {
+void postprocess(OraclePlan *plan, OraclePlan *old_plan) {
+    if (old_plan) {
+    // Example: If old_plan exists, copy some data from old_plan to plan
+        plan->oracle_plan = old_plan->oracle_plan;  // Just an example action
+    }
+
     for (auto& query_info_pair : plan->query_infos) {
         Target dbms_target = query_info_pair.first;
         QueryInfo& query_info = query_info_pair.second;
